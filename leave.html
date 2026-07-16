@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Leave Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fa;
+        --bg-card: #ffffff;
+        --text: #1a2332;
+        --text-muted: #4a5568;
+        --muted: #718096;
+        --accent: #0066b3;
+        --accent-hover: #004d8c;
+        --accent-soft: rgba(0, 102, 179, 0.1);
+        --danger: #c53030;
+        --border-subtle: #e2e8f0;
+        --radius-lg: 12px;
+        --radius-md: 8px;
+        --radius-sm: 6px;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .brand-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border-subtle);
+        margin-bottom: 24px;
+      }
+
+      .brand-header a {
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: inherit;
+      }
+
+      .brand-logo {
+        height: 40px;
+        width: auto;
+        display: block;
+      }
+
+      .brand-text {
+        font-size: 1.15rem;
+        font-weight: 650;
+        letter-spacing: 0.01em;
+        color: var(--text);
+      }
+
+      .page-shell {
+        position: relative;
+        min-height: 100vh;
+        padding: 0 20px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .page-inner {
+        width: 100%;
+        max-width: 1180px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .page-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 12px;
+      }
+
+      .page-title {
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: 0.03em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .page-title-pill {
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        color: var(--muted);
+      }
+
+      .page-subtitle {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-card);
+      }
+
+      .pill-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #22c55e;
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
+      }
+
+      .layout-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .page-content {
+        background: transparent;
+      }
+
+      .card {
+        border-radius: var(--radius-lg);
+        padding: 18px 18px 16px;
+      }
+
+      .card-panel {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .card-title {
+        font-size: 15px;
+        font-weight: 600;
+      }
+
+      .card-subtitle {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        color: var(--muted);
+      }
+
+      .badge strong {
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 6px;
+      }
+
+      .form-grid-compact {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      @media (max-width: 1200px) {
+        .form-grid {
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+        .form-grid-compact {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 640px) {
+        .form-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .form-grid-compact {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .field-label {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .field-label span {
+        color: var(--accent);
+      }
+
+      .input,
+      .select {
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-subtle);
+        background: var(--bg-card);
+        padding: 7px 10px;
+        font-size: 12px;
+        color: var(--text);
+        outline: none;
+      }
+
+      .input::placeholder {
+        color: var(--muted);
+      }
+
+      .input:focus,
+      .select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-soft);
+      }
+
+      .actions-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .btn {
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 12px;
+        padding: 6px 14px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: none;
+        color: var(--text);
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .btn-primary:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+
+      .btn-ghost {
+        border-color: var(--border-subtle);
+        color: var(--muted);
+      }
+
+      .btn-ghost:hover {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .btn-danger {
+        background: var(--danger);
+        color: #fff;
+        border-color: var(--danger);
+      }
+
+      .btn-danger:hover {
+        filter: brightness(1.08);
+      }
+
+      .btn-warning {
+        background: #ea580c;
+        color: #fff;
+        border-color: #ea580c;
+      }
+
+      .btn-warning:hover {
+        filter: brightness(1.08);
+      }
+
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+
+      .table-wrap {
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle);
+        overflow: hidden;
+        background: var(--bg-card);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      thead {
+        background: var(--accent-soft);
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border-subtle);
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      tbody tr:nth-child(even) {
+        background: rgba(0, 0, 0, 0.02);
+      }
+
+      tbody tr:hover {
+        background: var(--accent-soft);
+      }
+
+      .cell-small {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .badge-pill {
+        display: inline-flex;
+        padding: 2px 7px;
+        border-radius: 999px;
+        border: 1px solid var(--border-subtle);
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      .badge-pill annual {
+        color: var(--accent);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .highlight-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .error-text {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--danger);
+      }
+
+      .report-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .report-modal-overlay.open {
+        display: flex;
+      }
+
+      .report-modal {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        max-width: 560px;
+        width: 100%;
+        max-height: 90vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      }
+
+      .report-modal-header {
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .report-modal-body {
+        padding: 18px;
+        overflow: auto;
+      }
+
+      .report-modal-actions {
+        padding: 12px 18px;
+        border-top: 1px solid var(--border-subtle);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="brand-header" id="brand-header">
+      <a id="brand-link" href="#" target="_blank" rel="noopener" style="display: none;">
+        <img id="brand-logo" src="" alt="" class="brand-logo" />
+      </a>
+      <div id="brand-text" class="brand-text">Leave Manager</div>
+    </header>
+    <div class="page-shell">
+      <main class="page-inner page-content">
+        <header class="page-header">
+          <div>
+            <div class="page-title">
+              Leave Manager
+              <span class="page-title-pill">Baseline: Jan 2026</span>
+            </div>
+            <div class="page-subtitle">
+              Track employee leave balances, monthly annual leave accrual, and
+              yearly resets for other leave types.
+            </div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+            <button type="button" class="btn btn-ghost" id="export-data-btn">Export backup</button>
+            <button type="button" class="btn btn-ghost" id="import-data-btn">Import backup</button>
+            <input type="file" id="import-file-input" accept=".json" style="display: none;" />
+          </div>
+        </header>
+
+        <section class="layout-grid">
+          <!-- Top: Create Employee + Apply Leave -->
+          <section class="card card-panel">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Create Employee</div>
+                <div class="card-subtitle">
+                  Start balances are effective from 1&nbsp;Jan&nbsp;2026.
+                </div>
+              </div>
+              <span class="highlight-chip">
+                <span style="width: 6px; height: 6px; border-radius: 999px; background: var(--accent);"></span>
+                One row = one employee
+              </span>
+            </div>
+
+            <form id="employee-form">
+              <div class="form-grid">
+                <div class="field">
+                  <label class="field-label">Employee name <span>*</span></label>
+                  <input
+                    class="input"
+                    type="text"
+                    id="emp-name"
+                    placeholder="Jane Doe"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Start date (MM/YY) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="text"
+                    id="emp-start"
+                    placeholder="01/26"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Annual leave (days) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-annual"
+                    placeholder="e.g. 15.25"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Sick leave (days) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-sick"
+                    placeholder="e.g. 10.50"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Family resp. (days) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-family"
+                    placeholder="e.g. 3.00"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Study leave (days) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-study"
+                    placeholder="e.g. 5.25"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Religious leave (days) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-religious"
+                    placeholder="e.g. 2.00"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">Annual accrual / month <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-accrual"
+                    placeholder="e.g. 1.25"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div class="actions-row">
+                <button type="button" class="btn btn-ghost" id="reset-all">
+                  Clear all employees
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  Add employee
+                </button>
+              </div>
+
+              <div id="employee-form-error" class="error-text" style="display: none;"></div>
+            </form>
+
+            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
+
+            <div class="card-header" style="margin-bottom: 8px;">
+              <div>
+                <div class="card-title">Apply Leave</div>
+                <div class="card-subtitle">
+                  Deduct working days from an employee&apos;s balance.
+                </div>
+              </div>
+            </div>
+
+            <form id="leave-form">
+              <div class="form-grid form-grid-compact">
+                <div class="field">
+                  <label class="field-label">Employee <span>*</span></label>
+                  <select id="leave-employee" class="select" required>
+                    <option value="">Select employee</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="field-label">Leave type <span>*</span></label>
+                  <select id="leave-type" class="select" required>
+                    <option value="">Select type</option>
+                    <option value="annual">Annual</option>
+                    <option value="sick">Sick</option>
+                    <option value="family">Family responsibility</option>
+                    <option value="study">Study</option>
+                    <option value="religious">Religious</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label class="field-label">Working days taken <span>*</span></label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="leave-days"
+                    class="input"
+                    placeholder="e.g. 2.50"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label">First day of leave <span>*</span></label>
+                  <input type="date" id="leave-date" class="input" required />
+                </div>
+              </div>
+
+              <div class="actions-row">
+                <button type="submit" class="btn btn-primary">
+                  Apply leave
+                </button>
+              </div>
+              <div id="leave-form-error" class="error-text" style="display: none;"></div>
+            </form>
+          </section>
+
+          <!-- Bottom: Employees & Leave Balances -->
+          <section class="card card-panel">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Employees &amp; Leave Balances</div>
+                <div class="card-subtitle">
+                  Annual leave accrues each month from Jan&nbsp;2026.
+                </div>
+              </div>
+              <div class="badge">
+                Today: <strong id="current-date-label"></strong>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table id="employees-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Start (MM/YY)</th>
+                    <th>Annual</th>
+                    <th>Sick</th>
+                    <th>Family</th>
+                    <th>Study</th>
+                    <th>Religious</th>
+                    <th>Accrual /mo</th>
+                  </tr>
+                </thead>
+                <tbody id="employees-tbody">
+                  <tr>
+                    <td colspan="8" class="muted">
+                      No employees yet. Create one above.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
+
+            <div class="card-header" style="margin-bottom: 8px;">
+              <div>
+                <div class="card-title">Reporting</div>
+                <div class="card-subtitle">
+                  Select an employee and date range to view leave taken.
+                </div>
+              </div>
+            </div>
+
+            <div class="form-grid form-grid-compact" style="margin-bottom: 12px; max-width: 560px;">
+              <div class="field">
+                <label class="field-label">Employee <span>*</span></label>
+                <select id="report-employee-select" class="select">
+                  <option value="">Select employee</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label">Start date <span>*</span></label>
+                <input type="date" id="report-start-date" class="input" min="2026-01-01" />
+              </div>
+              <div class="field">
+                <label class="field-label">End date <span>*</span></label>
+                <input type="date" id="report-end-date" class="input" min="2026-01-01" />
+              </div>
+              <div class="field" style="align-self: flex-end;">
+                <button type="button" class="btn btn-primary" id="report-generate-btn">Generate report</button>
+              </div>
+            </div>
+            <div id="report-error" class="error-text" style="display: none;"></div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
+
+            <div class="card-header" style="margin-bottom: 8px;">
+              <div>
+                <div class="card-title">Manage Employees</div>
+                <div class="card-subtitle">
+                  Select an employee to view, edit, or delete.
+                </div>
+              </div>
+            </div>
+
+            <div class="field" style="max-width: 280px; margin-bottom: 12px;">
+              <label class="field-label">Select employee</label>
+              <select id="manage-employee-select" class="select">
+                <option value="">Select employee to manage</option>
+              </select>
+            </div>
+
+            <form id="manage-employee-form" style="display: none;">
+              <div class="form-grid" style="margin-bottom: 10px;">
+                <div class="field">
+                  <label class="field-label">Employee name <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-name" placeholder="Jane Doe" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Start date (MM/YY) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-start" placeholder="01/26" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Annual leave (days) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-annual" placeholder="15.25" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Sick leave (days) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-sick" placeholder="10.50" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Family resp. (days) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-family" placeholder="3.00" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Study leave (days) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-study" placeholder="5.25" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Religious leave (days) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-religious" placeholder="2.00" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Annual accrual / month <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-accrual" placeholder="1.25" inputmode="decimal" required />
+                </div>
+              </div>
+              <div class="actions-row">
+                <button type="button" class="btn btn-warning" id="manage-cancel-btn">Cancel</button>
+                <button type="button" class="btn btn-danger" id="manage-delete-btn">Delete employee</button>
+                <button type="submit" class="btn btn-primary" id="manage-save-btn">Save changes</button>
+              </div>
+              <div id="manage-form-error" class="error-text" style="display: none;"></div>
+            </form>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div id="report-modal-overlay" class="report-modal-overlay">
+      <div class="report-modal">
+        <div class="report-modal-header">
+          <strong id="report-modal-title">Leave report</strong>
+          <button type="button" class="btn btn-ghost" id="report-modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="report-modal-body">
+          <div class="table-wrap">
+            <table id="report-results-table">
+              <thead>
+                <tr>
+                  <th>Leave type</th>
+                  <th>Days taken</th>
+                  <th>First day of leave</th>
+                </tr>
+              </thead>
+              <tbody id="report-results-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="report-modal-actions">
+          <button type="button" class="btn btn-primary" id="report-save-file-btn">Save to file</button>
+          <button type="button" class="btn btn-ghost" id="report-modal-close-btn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="leave.js"></script>
+  </body>
+</html>
+

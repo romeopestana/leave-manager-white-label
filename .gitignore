@@ -1,0 +1,11 @@
+node_modules/
+.env
+*.log
+leave-manager-log.csv
+leave-manager-backup-*.json
+solution-backup-*.zip
+bat_debug.txt
+bat_out2.txt
+query
+.DS_Store
+.git/COMMIT_MSG.txt

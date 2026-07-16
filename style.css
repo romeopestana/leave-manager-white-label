@@ -1,0 +1,16 @@
+/* White-label Leave Manager theme */
+
+/* Improve input autofill (Chromium) */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #1a2332;
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px #fff inset;
+}
+
+/* Smooth text rendering */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
