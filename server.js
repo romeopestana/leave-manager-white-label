@@ -370,7 +370,7 @@ app.get("/api/employees", requireAuth, async (req, res) => {
   }
 });
 
-app.post("/api/employees/bulk-replace", requireAuth, requireRole("admin"), async (req, res) => {
+app.post("/api/employees/bulk-replace", requireAuth, requireRole("admin", "exco"), async (req, res) => {
   try {
     const payload = req.body;
     const employees = Array.isArray(payload) ? payload : payload?.employees;
@@ -507,7 +507,7 @@ app.post("/api/log", requireAuth, (req, res) => {
   }
 });
 
-app.post("/api/export", requireAuth, requireRole("admin", "exco"), (req, res) => {
+app.post("/api/export", requireAuth, requireRole("admin"), (req, res) => {
   try {
     const data = req.body;
     if (!data || !Array.isArray(data.employees)) {

@@ -16,7 +16,7 @@ This white-label edition is designed to be rebranded and customized for each cli
 
 - Admin: create/manage employees and user profiles, request leave, full admin tools
 - Employee: log in, view own leave balances, request leave
-- Exco: log in, view leave balances, run reports, approve/reject leave requests
+- Exco: log in, view leave balances, manage employee leave balances (special leave/corrections), run reports, approve/reject leave requests
 
 ## 3) Branding Requirements
 

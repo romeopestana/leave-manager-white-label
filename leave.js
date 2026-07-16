@@ -16,6 +16,7 @@ function applyRoleVisibility(user) {
   const isAdmin = role === "admin";
   const isExco = role === "exco";
   const isEmployee = role === "employee";
+  const canManageEmployees = isAdmin || isExco;
 
   const setShown = (id, shown) => {
     const el = document.getElementById(id);
@@ -24,18 +25,23 @@ function applyRoleVisibility(user) {
 
   setShown("admin-employee-create-panel", isAdmin);
   setShown("users-panel", isAdmin);
-  setShown("manage-employees-header", isAdmin);
-  setShown("manage-employees-panel", isAdmin);
+  setShown("manage-employees-section", canManageEmployees);
+  setShown("manage-employees-header", canManageEmployees);
+  setShown("manage-employees-panel", canManageEmployees);
   const manageForm = document.getElementById("manage-employee-form");
-  if (manageForm && !isAdmin) manageForm.style.display = "none";
+  if (manageForm && !canManageEmployees) manageForm.style.display = "none";
+
+  const deleteBtn = document.getElementById("manage-delete-btn");
+  if (deleteBtn) deleteBtn.style.display = isAdmin ? "" : "none";
 
   setShown("leave-request-panel", isAdmin || isEmployee);
   setShown("leave-approvals-panel", isExco || isAdmin || isEmployee);
+  setShown("reporting-section", isAdmin || isExco);
   setShown("reporting-panel", isAdmin || isExco);
 
   const exportBtn = document.getElementById("export-data-btn");
   const importBtn = document.getElementById("import-data-btn");
-  if (exportBtn) exportBtn.style.display = isAdmin || isExco ? "" : "none";
+  if (exportBtn) exportBtn.style.display = isAdmin ? "" : "none";
   if (importBtn) importBtn.style.display = isAdmin ? "" : "none";
 
   const label = document.getElementById("session-user-label");
@@ -1177,6 +1183,10 @@ function setupManageEmployee() {
 
   if (deleteBtn) {
     deleteBtn.addEventListener("click", async () => {
+      if (currentUser?.role !== "admin") {
+        alert("Only Admin can delete employees.");
+        return;
+      }
       const id = selectEl.value;
       if (!id) return;
       const employees = await loadEmployees();
