@@ -450,6 +450,10 @@
         <img id="brand-logo" src="" alt="" class="brand-logo" />
       </a>
       <div id="brand-text" class="brand-text">Leave Manager</div>
+      <div id="session-bar" style="margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 0.9rem;">
+        <span id="session-user-label" class="muted"></span>
+        <button type="button" class="btn btn-ghost" id="logout-btn">Sign out</button>
+      </div>
     </header>
     <div class="page-shell">
       <main class="page-inner page-content">
@@ -460,8 +464,8 @@
               <span class="page-title-pill">Baseline: Jan 2026</span>
             </div>
             <div class="page-subtitle">
-              Track employee leave balances, monthly annual leave accrual, and
-              yearly resets for other leave types.
+              Track employee leave balances, month-end annual accrual, yearly
+              resets for other leave types, and configurable annual carry-over.
             </div>
           </div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
@@ -472,8 +476,8 @@
         </header>
 
         <section class="layout-grid">
-          <!-- Top: Create Employee + Apply Leave -->
-          <section class="card card-panel">
+          <!-- Top: Create Employee + Request Leave -->
+          <section class="card card-panel" id="admin-employee-create-panel">
             <div class="card-header">
               <div>
                 <div class="card-title">Create Employee</div>
@@ -587,6 +591,19 @@
                     required
                   />
                 </div>
+                <div class="field">
+                  <label class="field-label">Annual max carry-over (days) <span>*</span></label>
+                  <input
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    id="emp-max-carry"
+                    placeholder="e.g. 5.00"
+                    inputmode="decimal"
+                    required
+                  />
+                </div>
               </div>
 
               <div class="actions-row">
@@ -600,14 +617,14 @@
 
               <div id="employee-form-error" class="error-text" style="display: none;"></div>
             </form>
+          </section>
 
-            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
-
+          <section class="card card-panel" id="leave-request-panel">
             <div class="card-header" style="margin-bottom: 8px;">
               <div>
-                <div class="card-title">Apply Leave</div>
+                <div class="card-title">Request Leave</div>
                 <div class="card-subtitle">
-                  Deduct working days from an employee&apos;s balance.
+                  Submits a request for Exco approval before balances are updated.
                 </div>
               </div>
             </div>
@@ -652,11 +669,99 @@
 
               <div class="actions-row">
                 <button type="submit" class="btn btn-primary">
-                  Apply leave
+                  Submit for approval
                 </button>
               </div>
               <div id="leave-form-error" class="error-text" style="display: none;"></div>
             </form>
+          </section>
+
+          <section class="card card-panel" id="leave-approvals-panel">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Leave Approvals</div>
+                <div class="card-subtitle">Exco reviews pending leave requests.</div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table id="leave-requests-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Type</th>
+                    <th>Days</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Requested by</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="leave-requests-tbody">
+                  <tr>
+                    <td colspan="7" class="muted">No leave requests yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card card-panel" id="users-panel">
+            <div class="card-header">
+              <div>
+                <div class="card-title">User Profiles</div>
+                <div class="card-subtitle">Admin creates Admin, Employee, and Exco logins.</div>
+              </div>
+            </div>
+            <form id="user-form" class="form-grid form-grid-compact" style="margin-bottom: 12px;">
+              <div class="field">
+                <label class="field-label">Name <span>*</span></label>
+                <input class="input" id="user-name" required />
+              </div>
+              <div class="field">
+                <label class="field-label">Company email <span>*</span></label>
+                <input class="input" type="email" id="user-email" required />
+              </div>
+              <div class="field">
+                <label class="field-label">Role <span>*</span></label>
+                <select class="select" id="user-role" required>
+                  <option value="employee">Employee</option>
+                  <option value="exco">Exco</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label">Linked employee</label>
+                <select class="select" id="user-employee-link">
+                  <option value="">None</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="field-label">Temporary password <span>*</span></label>
+                <input class="input" type="text" id="user-password" minlength="8" required />
+              </div>
+              <div class="field" style="align-self: flex-end;">
+                <button type="submit" class="btn btn-primary">Create user</button>
+              </div>
+            </form>
+            <div id="user-form-error" class="error-text" style="display: none;"></div>
+            <div class="table-wrap">
+              <table id="users-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Linked employee</th>
+                    <th>Active</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <tr>
+                    <td colspan="5" class="muted">No users yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <!-- Bottom: Employees & Leave Balances -->
@@ -665,7 +770,7 @@
               <div>
                 <div class="card-title">Employees &amp; Leave Balances</div>
                 <div class="card-subtitle">
-                  Annual leave accrues each month from Jan&nbsp;2026.
+                  Annual accrues on month-end from Jan&nbsp;2026. Other leave resets on 1&nbsp;Jan.
                 </div>
               </div>
               <div class="badge">
@@ -685,11 +790,12 @@
                     <th>Study</th>
                     <th>Religious</th>
                     <th>Accrual /mo</th>
+                    <th>Max carry</th>
                   </tr>
                 </thead>
                 <tbody id="employees-tbody">
                   <tr>
-                    <td colspan="8" class="muted">
+                    <td colspan="9" class="muted">
                       No employees yet. Create one above.
                     </td>
                   </tr>
@@ -708,7 +814,7 @@
               </div>
             </div>
 
-            <div class="form-grid form-grid-compact" style="margin-bottom: 12px; max-width: 560px;">
+            <div id="reporting-panel" class="form-grid form-grid-compact" style="margin-bottom: 12px; max-width: 560px;">
               <div class="field">
                 <label class="field-label">Employee <span>*</span></label>
                 <select id="report-employee-select" class="select">
@@ -731,7 +837,7 @@
 
             <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
 
-            <div class="card-header" style="margin-bottom: 8px;">
+            <div class="card-header" style="margin-bottom: 8px;" id="manage-employees-header">
               <div>
                 <div class="card-title">Manage Employees</div>
                 <div class="card-subtitle">
@@ -740,7 +846,7 @@
               </div>
             </div>
 
-            <div class="field" style="max-width: 280px; margin-bottom: 12px;">
+            <div class="field" style="max-width: 280px; margin-bottom: 12px;" id="manage-employees-panel">
               <label class="field-label">Select employee</label>
               <select id="manage-employee-select" class="select">
                 <option value="">Select employee to manage</option>
@@ -780,6 +886,10 @@
                 <div class="field">
                   <label class="field-label">Annual accrual / month <span>*</span></label>
                   <input class="input" type="text" id="manage-emp-accrual" placeholder="1.25" inputmode="decimal" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Annual max carry-over (days) <span>*</span></label>
+                  <input class="input" type="text" id="manage-emp-max-carry" placeholder="5.00" inputmode="decimal" required />
                 </div>
               </div>
               <div class="actions-row">

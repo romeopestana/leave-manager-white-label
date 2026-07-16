@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sign in | Leave Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --bg-card: #ffffff;
+        --text: #1a2332;
+        --muted: #718096;
+        --accent: #0066b3;
+        --accent-hover: #004d8c;
+        --border-subtle: #e2e8f0;
+        --danger: #c53030;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      }
+      .login-card {
+        width: min(420px, calc(100vw - 32px));
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        padding: 28px 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.35rem;
+      }
+      .subtitle {
+        margin: 0 0 20px;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.4;
+      }
+      label {
+        display: block;
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 14px;
+        font: inherit;
+      }
+      button {
+        width: 100%;
+        border: none;
+        border-radius: 8px;
+        padding: 11px 14px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--accent-hover);
+      }
+      .error {
+        display: none;
+        color: var(--danger);
+        margin: 0 0 12px;
+        font-size: 0.9rem;
+      }
+      .hint {
+        margin-top: 16px;
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-card">
+      <h1 id="login-title">Leave Manager</h1>
+      <p class="subtitle">
+        Sign in with your company email. Phase 1 uses a temporary password.
+        Google Workspace login will be enabled next.
+      </p>
+      <div id="login-error" class="error"></div>
+      <form id="login-form">
+        <label for="login-email">Company email</label>
+        <input id="login-email" type="email" required autocomplete="username" placeholder="you@company.com" />
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" required autocomplete="current-password" />
+        <button type="submit">Sign in</button>
+      </form>
+      <p class="hint">
+        First-run admin (if seeded): check the server console for email/password.
+        Configure allowed domains in <code>config/brand.json</code>.
+      </p>
+    </div>
+    <script>
+      async function loadBrand() {
+        try {
+          const res = await fetch("/config/brand.json", { cache: "no-store" });
+          if (!res.ok) return;
+          const brand = await res.json();
+          const title = brand.pageTitle || brand.productName || "Leave Manager";
+          document.title = "Sign in | " + title;
+          document.getElementById("login-title").textContent = title;
+          if (brand.accentColor) document.documentElement.style.setProperty("--accent", brand.accentColor);
+          if (brand.accentHover) document.documentElement.style.setProperty("--accent-hover", brand.accentHover);
+        } catch {}
+      }
+
+      document.getElementById("login-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById("login-error");
+        errorEl.style.display = "none";
+        const email = document.getElementById("login-email").value.trim();
+        const password = document.getElementById("login-password").value;
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Login failed");
+          window.location.href = "/leave.html";
+        } catch (err) {
+          errorEl.textContent = err.message || "Login failed";
+          errorEl.style.display = "block";
+        }
+      });
+
+      loadBrand();
+    </script>
+  </body>
+</html>

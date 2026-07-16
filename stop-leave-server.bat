@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set "PORT=3000"
+set "PORT=3001"
 echo Stopping Leave Manager server on port %PORT% ...
 
 set "FOUND=0"

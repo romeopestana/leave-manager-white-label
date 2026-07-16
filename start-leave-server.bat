@@ -7,7 +7,7 @@ if not exist node_modules (
 )
 
 echo Starting Leave Manager server...
-echo Open http://localhost:3000 in your browser.
+echo Open http://localhost:3001 in your browser.
 echo.
 echo Backups and log (leave-manager-log.csv) saved to this folder.
 echo Press Ctrl+C to stop the server.

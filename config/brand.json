@@ -5,5 +5,10 @@
   "logoPath": "",
   "websiteUrl": "",
   "accentColor": "#0066b3",
-  "accentHover": "#004d8c"
+  "accentHover": "#004d8c",
+  "companyDomains": ["yourcompany.com"],
+  "auth": {
+    "allowLocalLogin": true,
+    "googleOAuthEnabled": false
+  }
 }

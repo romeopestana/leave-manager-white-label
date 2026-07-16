@@ -9,3 +9,5 @@ bat_out2.txt
 query
 .DS_Store
 .git/COMMIT_MSG.txt
+data/app-store.json
+data/email-outbox.jsonl

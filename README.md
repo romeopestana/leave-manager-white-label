@@ -38,16 +38,25 @@ Edit `config/brand.json`:
 
 - Leave types: `annual`, `sick`, `family`, `study`, `religious`.
 - Baseline year: `2026`.
-- Annual leave accrues monthly.
-- Sick/Family/Study/Religious deduct only current-year transactions and effectively reset on 1 January.
+- Annual leave:
+  - Accrues on the **last day of each month**.
+  - Unused annual leave carries into the next year up to each employee’s **max carry-over** days; excess is forfeited on 1 January.
+- Sick/Family/Study/Religious:
+  - Reset on **1 January** every year (only current-year usage is deducted).
+  - Carry month-to-month within the same year.
 
 ## Run Locally
 
 1. `npm install`
 2. Optional: set `DATABASE_URL`
 3. `node server.js`
-4. Open `http://localhost:3000`
+4. Open `http://localhost:3001`
 
-## Branch
+## Auth (Phase 1)
 
-Primary development branch: `White-label`
+- Login page: `/login.html`
+- Roles: Admin, Employee, Exco
+- Temporary local password login (Google Workspace OAuth next)
+- Leave requests require Exco approval (Admin requests included)
+- Notifications currently queued to `data/email-outbox.jsonl`
+- Setup guide: `docs/AUTH-SETUP.md`

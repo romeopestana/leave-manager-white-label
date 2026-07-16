@@ -9,7 +9,7 @@ $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 $Shortcut.TargetPath = "C:\Windows\System32\cmd.exe"
 $Shortcut.Arguments = "/c `"$batPath`""
 $Shortcut.WorkingDirectory = $Root
-$Shortcut.Description = "Stop Leave Manager server (port 3000)"
+$Shortcut.Description = "Stop Leave Manager server (port 3001)"
 $Shortcut.WindowStyle = 1
 $Shortcut.Save()
 
