@@ -7,7 +7,24 @@ const { Pool } = require("pg");
 const { readStore, writeStore } = require("./lib/fileStore");
 const users = require("./lib/users");
 const leaveRequests = require("./lib/leaveRequests");
-const { notify } = require("./lib/notifications");
+const { notify, smtpConfigured } = require("./lib/notifications");
+const googleAuth = require("./lib/googleAuth");
+
+function loadEnvFileIfPresent() {
+  const envPath = path.join(__dirname, ".env");
+  if (!fs.existsSync(envPath)) return;
+  const raw = fs.readFileSync(envPath, "utf8");
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const idx = trimmed.indexOf("=");
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    const value = trimmed.slice(idx + 1).trim();
+    if (key && process.env[key] == null) process.env[key] = value;
+  }
+}
+loadEnvFileIfPresent();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -40,6 +57,21 @@ function loadBrandConfig() {
 function companyDomains() {
   const brand = loadBrandConfig();
   return Array.isArray(brand.companyDomains) ? brand.companyDomains : [];
+}
+
+function authOptions() {
+  const brand = loadBrandConfig();
+  const auth = brand.auth || {};
+  const googleEnabled =
+    auth.googleOAuthEnabled === true && googleAuth.googleConfigured();
+  const localEnabled = auth.allowLocalLogin !== false;
+  return {
+    googleEnabled,
+    localEnabled,
+    googleConfigured: googleAuth.googleConfigured(),
+    smtpConfigured: smtpConfigured(),
+    companyDomains: companyDomains(),
+  };
 }
 
 // -------- Postgres (optional) --------
@@ -287,8 +319,16 @@ app.get("/api/auth/me", (req, res) => {
   res.json({ authenticated: true, user });
 });
 
+app.get("/api/auth/options", (req, res) => {
+  res.json(authOptions());
+});
+
 app.post("/api/auth/login", async (req, res) => {
   try {
+    const opts = authOptions();
+    if (!opts.localEnabled) {
+      return res.status(403).json({ error: "Password login is disabled for this company." });
+    }
     const email = req.body?.email;
     const password = req.body?.password;
     const user = await users.verifyLogin(email, password, companyDomains());
@@ -297,6 +337,58 @@ app.post("/api/auth/login", async (req, res) => {
     res.json({ ok: true, user: req.session.user });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+app.get("/api/auth/google", (req, res) => {
+  try {
+    const opts = authOptions();
+    if (!opts.googleEnabled) {
+      return res.redirect("/login.html?error=" + encodeURIComponent("Google sign-in is not enabled."));
+    }
+    const url = googleAuth.getAuthorizeUrl(companyDomains());
+    res.redirect(url);
+  } catch (err) {
+    res.redirect("/login.html?error=" + encodeURIComponent(err.message || "Google sign-in failed."));
+  }
+});
+
+app.get("/api/auth/google/callback", async (req, res) => {
+  try {
+    const opts = authOptions();
+    if (!opts.googleEnabled) {
+      return res.redirect("/login.html?error=" + encodeURIComponent("Google sign-in is not enabled."));
+    }
+    if (req.query.error) {
+      return res.redirect(
+        "/login.html?error=" + encodeURIComponent(String(req.query.error_description || req.query.error)),
+      );
+    }
+    const code = req.query.code;
+    if (!code) {
+      return res.redirect("/login.html?error=" + encodeURIComponent("Missing Google authorization code."));
+    }
+
+    const profile = await googleAuth.getGoogleProfileFromCode(String(code));
+    if (!users.isDomainAllowed(profile.email, companyDomains())) {
+      return res.redirect(
+        "/login.html?error=" + encodeURIComponent("Google email domain is not allowed for this company."),
+      );
+    }
+
+    const user = users.resolveGoogleLogin(profile.email, companyDomains());
+    // Keep directory name in sync when Google provides a display name.
+    if (profile.name && profile.name !== user.name) {
+      try {
+        await users.updateUser(user.id, { name: profile.name }, companyDomains());
+      } catch {
+        // non-fatal
+      }
+    }
+    req.session.user = users.publicUser(users.findUserById(user.id) || user);
+    res.redirect("/leave.html");
+  } catch (err) {
+    res.redirect("/login.html?error=" + encodeURIComponent(err.message || "Google sign-in failed."));
   }
 });
 
@@ -318,7 +410,7 @@ app.post("/api/users", requireAuth, requireRole("admin"), async (req, res) => {
     await notify({
       to: created.email,
       subject: "Leave Manager account created",
-      body: `An account was created for you with role: ${created.role}. Sign in at /login.html using your company email and temporary password.`,
+      body: `An account was created for you with role: ${created.role}. Sign in at /login.html using your company email (password and/or Google, depending on company settings).`,
       meta: { type: "user_created", userId: created.id },
     });
     res.status(201).json(created);
@@ -379,6 +471,28 @@ app.post("/api/employees/bulk-replace", requireAuth, requireRole("admin", "exco"
   } catch (err) {
     console.error("POST /api/employees/bulk-replace failed:", err);
     res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
+app.post("/api/employees/profile-updated-notify", requireAuth, requireRole("exco"), async (req, res) => {
+  try {
+    const user = currentUser(req);
+    const { employeeId, changes, balances } = req.body || {};
+    if (!employeeId) return res.status(400).json({ error: "employeeId is required." });
+
+    const allEmployees = await loadEmployees();
+    const employee = allEmployees.find((e) => e.id === employeeId);
+    if (!employee) return res.status(404).json({ error: "Employee not found." });
+
+    await leaveRequests.notifyEmployeeProfileUpdated({
+      employee,
+      actor: user,
+      changes: Array.isArray(changes) ? changes : [],
+      balances: balances || null,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
   }
 });
 
@@ -544,7 +658,17 @@ initDb()
         console.log("  password:", seeded.password);
         console.log("  ", seeded.note);
       }
-      console.log("Phase 1 auth: local email/password. Google OAuth + SMTP come next.");
+      const opts = authOptions();
+      console.log(
+        "Auth: local=" +
+          opts.localEnabled +
+          " google=" +
+          opts.googleEnabled +
+          " (credentials=" +
+          opts.googleConfigured +
+          ") smtp=" +
+          opts.smtpConfigured,
+      );
       if (DB_ENABLED) console.log("Postgres enabled (DATABASE_URL set).");
       else console.log("File store enabled (data/app-store.json). Set DATABASE_URL for Postgres.");
       console.log("");

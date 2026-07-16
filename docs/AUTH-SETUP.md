@@ -1,40 +1,58 @@
-# Auth & Email Setup (Phase 1 → Google)
+# Auth & Email Setup (Google OAuth + SMTP)
 
-Phase 1 is live with **local email/password** login and a local email outbox.
-Use this guide when you are ready for Google Workspace OAuth + SMTP.
+Single-tenant setup: each company has its own deployment, `.env`, and `brand.json`.
 
-## Current Phase 1 behaviour
+## Sign-in modes
 
-- Login: `/login.html` with company email + temporary password
-- Roles: `admin`, `employee`, `exco`
-- Leave requests require Exco approval (including Admin submissions)
-- Notifications are written to `data/email-outbox.jsonl` (not emailed yet)
-- Allowed email domains: `config/brand.json` → `companyDomains`
+| Mode | When it appears |
+|---|---|
+| Company email + password | `auth.allowLocalLogin: true` (default) |
+| Google Workspace | `auth.googleOAuthEnabled: true` **and** `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` set |
 
-### First admin
+Google sign-in only works for emails that already have a user profile created by Admin, and whose domain is in `companyDomains`.
 
-On first server start, a seed admin is created (see console):
-
-- Default email: `admin@yourcompany.com`
-- Default password: `ChangeMe123!`
-- Override with `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`
-
-## 1) Google Cloud OAuth client
+## 1) Enable Google OAuth
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/)
-2. Create/select a project
-3. Enable **Google Identity / OAuth consent screen**
-4. App type: Internal (Workspace) if only company users
-5. Create OAuth client ID:
-   - Application type: Web application
-   - Authorized redirect URI: `http://localhost:3001/api/auth/google/callback`
-6. Copy Client ID and Client Secret into `.env`
+2. Create/select a project for this tenant
+3. Configure OAuth consent screen (Internal for Workspace-only companies)
+4. Create OAuth client ID → Web application
+5. Authorized redirect URI:
 
-## 2) Google Workspace SMTP
+```text
+http://localhost:3001/api/auth/google/callback
+```
 
-1. In Google Admin, ensure SMTP is allowed for the sending account
-2. Prefer an App Password (or Workspace SMTP relay)
-3. Put values in `.env`:
+For production, add your real HTTPS callback, e.g.:
+
+```text
+https://leave.client.com/api/auth/google/callback
+```
+
+6. Put values in `.env`:
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
+```
+
+7. In `config/brand.json`:
+
+```json
+"auth": {
+  "allowLocalLogin": true,
+  "googleOAuthEnabled": true
+}
+```
+
+8. Restart the server. Login page shows **Sign in with Google**.
+
+## 2) Enable Google Workspace SMTP
+
+1. Use a Workspace mailbox (or SMTP relay) for this tenant
+2. Create an App Password if required
+3. Set `.env`:
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -45,35 +63,29 @@ SMTP_PASS=your-app-password
 SMTP_FROM=Leave Manager <leave@yourcompany.com>
 ```
 
-## 3) Environment variables
+4. Restart the server. Notifications send over SMTP and are also logged to `data/email-outbox.jsonl`.
 
-Copy `.env.example` to `.env` and fill in values:
+If SMTP is missing or fails, messages stay in the local outbox (`queued-local` / `smtp-failed-queued-local`).
 
-```env
-SESSION_SECRET=replace-with-long-random-string
-SEED_ADMIN_EMAIL=admin@yourcompany.com
-SEED_ADMIN_PASSWORD=ChangeMe123!
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
-```
-
-## 4) Brand config
+## 3) Brand domains
 
 ```json
-{
-  "companyDomains": ["yourcompany.com"],
-  "auth": {
-    "allowLocalLogin": true,
-    "googleOAuthEnabled": false
-  }
-}
+"companyDomains": ["yourcompany.com"]
 ```
 
-Set `googleOAuthEnabled` to `true` after OAuth credentials are configured (Phase 2 wiring).
+Only these email domains can sign in (password or Google).
+
+## 4) Test checklist
+
+1. Admin creates user profile for `person@yourcompany.com`
+2. Password login works (if local enabled)
+3. Google login works for that same email (if Google enabled)
+4. Leave request emails Exco (employee in CC) with login link
+5. Exco profile updates email the employee (Exco in CC) with login link
+6. Approve/reject emails the employee (Exco in CC)
+
+## Security notes
+
+- Never commit `.env`
+- Use a unique `SESSION_SECRET` per tenant
+- Keep each company on its own deployment (single-tenant)

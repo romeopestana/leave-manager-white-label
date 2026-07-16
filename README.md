@@ -52,11 +52,12 @@ Edit `config/brand.json`:
 3. `node server.js`
 4. Open `http://localhost:3001`
 
-## Auth (Phase 1)
+## Auth (Phase 1 + Phase 2)
 
 - Login page: `/login.html`
 - Roles: Admin, Employee, Exco
-- Temporary local password login (Google Workspace OAuth next)
+- Local email/password login (always available when `allowLocalLogin` is true)
+- Optional Google Workspace OAuth (`googleOAuthEnabled` + `.env` credentials)
+- Optional SMTP email (`SMTP_*` in `.env`); otherwise local outbox fallback
 - Leave requests require Exco approval (Admin requests included)
-- Notifications currently queued to `data/email-outbox.jsonl`
 - Setup guide: `docs/AUTH-SETUP.md`

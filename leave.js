@@ -1132,6 +1132,7 @@ function setupManageEmployee() {
       let employees = await loadEmployees();
       const currentEmp = employees.find((e) => e.id === id);
       if (!currentEmp) return;
+      const beforeBalances = getBalancesForEmployee(currentEmp);
       const taken = getLeaveTakenForEmployee(currentEmp);
       const empForSolve = {
         ...currentEmp,
@@ -1155,6 +1156,69 @@ function setupManageEmployee() {
         annualMaxCarryOver,
       });
       await saveEmployees(employees);
+
+      const updatedEmp = employees.find((e) => e.id === id);
+      const afterBalances = updatedEmp ? getBalancesForEmployee(updatedEmp) : null;
+      const changes = [];
+      if ((currentEmp.name || "") !== name) changes.push(`Name: ${currentEmp.name || ""} → ${name}`);
+      if ((currentEmp.startDisplay || "") !== startText) {
+        changes.push(`Start date: ${currentEmp.startDisplay || ""} → ${startText}`);
+      }
+      if (beforeBalances && afterBalances) {
+        for (const key of ["annual", "sick", "family", "study", "religious"]) {
+          if (Number(beforeBalances[key]) !== Number(afterBalances[key])) {
+            changes.push(
+              `${key}: ${Number(beforeBalances[key]).toFixed(2)} → ${Number(afterBalances[key]).toFixed(2)}`,
+            );
+          }
+        }
+      }
+      if (Number(currentEmp.annualAccrualPerMonth || 0) !== accrual) {
+        changes.push(
+          `Accrual/month: ${Number(currentEmp.annualAccrualPerMonth || 0).toFixed(2)} → ${accrual.toFixed(2)}`,
+        );
+      }
+      if (Number(currentEmp.annualMaxCarryOver || 0) !== annualMaxCarryOver) {
+        changes.push(
+          `Max carry-over: ${Number(currentEmp.annualMaxCarryOver || 0).toFixed(2)} → ${annualMaxCarryOver.toFixed(2)}`,
+        );
+      }
+      if (!changes.length) changes.push("Profile saved with no numeric/name field differences detected.");
+
+      if (currentUser?.role === "exco") {
+        try {
+          const notifyRes = await fetch("/api/employees/profile-updated-notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              employeeId: id,
+              changes,
+              balances: afterBalances
+                ? {
+                    annual: afterBalances.annual.toFixed(2),
+                    sick: afterBalances.sick.toFixed(2),
+                    family: afterBalances.family.toFixed(2),
+                    study: afterBalances.study.toFixed(2),
+                    religious: afterBalances.religious.toFixed(2),
+                    accrual: accrual.toFixed(2),
+                    maxCarry: annualMaxCarryOver.toFixed(2),
+                  }
+                : null,
+            }),
+          });
+          const notifyData = await notifyRes.json();
+          if (!notifyRes.ok) {
+            alert(
+              "Profile saved, but email notification failed: " +
+                (notifyData.error || "unknown error") +
+                ". Ensure the employee has a linked user email.",
+            );
+          }
+        } catch (err) {
+          alert("Profile saved, but email notification could not be sent.");
+        }
+      }
+
       logToServer({
         action: "Updated",
         employeeName: name,

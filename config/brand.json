@@ -1,12 +1,12 @@
 {
   "productName": "Leave Manager",
-  "companyName": "Your Company",
-  "pageTitle": "Leave Manager",
-  "logoPath": "",
+  "companyName": "Redfiniti",
+  "pageTitle": "Leave Manager | Redfiniti",
+  "logoPath": "assets/redfiniti-logo.jpg",
   "websiteUrl": "",
   "accentColor": "#0066b3",
   "accentHover": "#004d8c",
-  "companyDomains": ["yourcompany.com"],
+  "companyDomains": ["redfiniti.com"],
   "auth": {
     "allowLocalLogin": true,
     "googleOAuthEnabled": false

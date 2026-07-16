@@ -56,7 +56,7 @@
         margin-bottom: 14px;
         font: inherit;
       }
-      button {
+      button, .btn-google {
         width: 100%;
         border: none;
         border-radius: 8px;
@@ -66,9 +66,36 @@
         font: inherit;
         font-weight: 600;
         cursor: pointer;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        box-sizing: border-box;
       }
-      button:hover {
+      button:hover, .btn-google:hover {
         background: var(--accent-hover);
+      }
+      .btn-google {
+        background: #fff;
+        color: var(--text);
+        border: 1px solid var(--border-subtle);
+        margin-bottom: 14px;
+      }
+      .btn-google:hover {
+        background: #f7fafc;
+      }
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 8px 0 14px;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .divider::before, .divider::after {
+        content: "";
+        height: 1px;
+        background: var(--border-subtle);
+        flex: 1;
       }
       .error {
         display: none;
@@ -82,29 +109,53 @@
         color: var(--muted);
         line-height: 1.45;
       }
+      #local-login-block[hidden],
+      #google-login-block[hidden],
+      #auth-divider[hidden] {
+        display: none !important;
+      }
     </style>
   </head>
   <body>
     <div class="login-card">
       <h1 id="login-title">Leave Manager</h1>
-      <p class="subtitle">
-        Sign in with your company email. Phase 1 uses a temporary password.
-        Google Workspace login will be enabled next.
+      <p class="subtitle" id="login-subtitle">
+        Sign in with your company account.
       </p>
       <div id="login-error" class="error"></div>
-      <form id="login-form">
-        <label for="login-email">Company email</label>
-        <input id="login-email" type="email" required autocomplete="username" placeholder="you@company.com" />
-        <label for="login-password">Password</label>
-        <input id="login-password" type="password" required autocomplete="current-password" />
-        <button type="submit">Sign in</button>
-      </form>
+
+      <div id="google-login-block" hidden>
+        <a class="btn-google" id="google-login-btn" href="/api/auth/google">Sign in with Google</a>
+      </div>
+      <div class="divider" id="auth-divider" hidden>or</div>
+
+      <div id="local-login-block">
+        <form id="login-form">
+          <label for="login-email">Company email</label>
+          <input id="login-email" type="email" required autocomplete="username" placeholder="you@company.com" />
+          <label for="login-password">Password</label>
+          <input id="login-password" type="password" required autocomplete="current-password" />
+          <button type="submit">Sign in with password</button>
+        </form>
+      </div>
+
       <p class="hint">
-        First-run admin (if seeded): check the server console for email/password.
-        Configure allowed domains in <code>config/brand.json</code>.
+        Google sign-in requires an existing user profile created by Admin.
+        Configure OAuth/SMTP in <code>.env</code> and enable Google in <code>config/brand.json</code>.
       </p>
     </div>
     <script>
+      function showError(msg) {
+        const errorEl = document.getElementById("login-error");
+        if (!msg) {
+          errorEl.style.display = "none";
+          errorEl.textContent = "";
+          return;
+        }
+        errorEl.textContent = msg;
+        errorEl.style.display = "block";
+      }
+
       async function loadBrand() {
         try {
           const res = await fetch("/config/brand.json", { cache: "no-store" });
@@ -118,10 +169,41 @@
         } catch {}
       }
 
+      async function loadAuthOptions() {
+        const googleBlock = document.getElementById("google-login-block");
+        const localBlock = document.getElementById("local-login-block");
+        const divider = document.getElementById("auth-divider");
+        try {
+          const res = await fetch("/api/auth/options", { cache: "no-store" });
+          const opts = await res.json();
+          const googleOn = Boolean(opts.googleEnabled);
+          const localOn = opts.localEnabled !== false;
+          googleBlock.hidden = !googleOn;
+          localBlock.hidden = !localOn;
+          divider.hidden = !(googleOn && localOn);
+          if (googleOn && !localOn) {
+            document.getElementById("login-subtitle").textContent =
+              "Sign in with your company Google Workspace account.";
+          } else if (!googleOn && localOn) {
+            document.getElementById("login-subtitle").textContent =
+              "Sign in with your company email and password.";
+          } else {
+            document.getElementById("login-subtitle").textContent =
+              "Sign in with Google Workspace or your company email and password.";
+          }
+          if (!googleOn && !localOn) {
+            showError("No sign-in methods are enabled. Check brand.json auth settings.");
+          }
+        } catch {
+          googleBlock.hidden = true;
+          divider.hidden = true;
+          localBlock.hidden = false;
+        }
+      }
+
       document.getElementById("login-form").addEventListener("submit", async (e) => {
         e.preventDefault();
-        const errorEl = document.getElementById("login-error");
-        errorEl.style.display = "none";
+        showError("");
         const email = document.getElementById("login-email").value.trim();
         const password = document.getElementById("login-password").value;
         try {
@@ -134,12 +216,15 @@
           if (!res.ok) throw new Error(data.error || "Login failed");
           window.location.href = "/leave.html";
         } catch (err) {
-          errorEl.textContent = err.message || "Login failed";
-          errorEl.style.display = "block";
+          showError(err.message || "Login failed");
         }
       });
 
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error")) showError(params.get("error"));
+
       loadBrand();
+      loadAuthOptions();
     </script>
   </body>
 </html>
