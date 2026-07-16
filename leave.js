@@ -102,19 +102,25 @@ function renderUsers(userList, employees) {
   tbody.innerHTML = "";
   if (!userList.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="5" class="muted">No users yet.</td>`;
+    tr.innerHTML = `<td colspan="6" class="muted">No users yet.</td>`;
     tbody.appendChild(tr);
     return;
   }
   const empMap = new Map((employees || []).map((e) => [e.id, e.name]));
   for (const u of userList) {
     const tr = document.createElement("tr");
+    const selfLabel = currentUser?.id === u.id ? " (you)" : "";
     tr.innerHTML = `
-      <td>${escapeHtml(u.name || "")}</td>
+      <td>${escapeHtml(u.name || "")}${escapeHtml(selfLabel)}</td>
       <td>${escapeHtml(u.email || "")}</td>
       <td>${escapeHtml(u.role || "")}</td>
       <td>${escapeHtml(u.employeeId ? empMap.get(u.employeeId) || u.employeeId : "—")}</td>
       <td>${u.active === false ? "No" : "Yes"}</td>
+      <td>
+        <button type="button" class="btn btn-ghost btn-reset-password" data-id="${escapeHtml(u.id)}" data-email="${escapeHtml(u.email || "")}">
+          Reset password
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   }
@@ -912,6 +918,89 @@ function setupEmployeeForm() {
   }
 }
 
+function isWeekendDate(d) {
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
+function toDateOnlyLocal(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function workingDaySpanLocal(startValue, days) {
+  const startRaw = toDateOnlyLocal(startValue);
+  if (!startRaw) return null;
+  const qty = Number(days) || 0;
+  if (qty <= 0) return null;
+  let start = new Date(startRaw);
+  while (isWeekendDate(start)) start.setDate(start.getDate() + 1);
+  let remaining = Math.max(1, Math.ceil(qty - 1e-9)) - 1;
+  let end = new Date(start);
+  while (remaining > 0) {
+    end.setDate(end.getDate() + 1);
+    if (!isWeekendDate(end)) remaining -= 1;
+  }
+  return { start, end };
+}
+
+function rangesOverlapLocal(a, b) {
+  if (!a || !b) return false;
+  return a.start.getTime() <= b.end.getTime() && b.start.getTime() <= a.end.getTime();
+}
+
+function findLeaveClashesLocal({ employeeId, dateISO, days, employeeTransactions, leaveRequests }) {
+  const proposed = workingDaySpanLocal(dateISO, days);
+  if (!proposed) return [];
+  const clashes = [];
+  for (const tx of employeeTransactions || []) {
+    if (!tx?.dateISO) continue;
+    const span = workingDaySpanLocal(tx.dateISO, tx.days);
+    if (!rangesOverlapLocal(proposed, span)) continue;
+    clashes.push({
+      type: tx.type,
+      days: Number(tx.days) || 0,
+      start: span.start,
+      end: span.end,
+      status: "approved",
+    });
+  }
+  for (const req of leaveRequests || []) {
+    if (!req || req.employeeId !== employeeId || req.status !== "pending") continue;
+    const span = workingDaySpanLocal(req.dateISO, req.days);
+    if (!rangesOverlapLocal(proposed, span)) continue;
+    clashes.push({
+      type: req.type,
+      days: Number(req.days) || 0,
+      start: span.start,
+      end: span.end,
+      status: "pending approval",
+    });
+  }
+  return clashes;
+}
+
+function formatClashMessageLocal(clashes) {
+  if (!clashes.length) return "";
+  const lines = clashes.map((c) => {
+    const start = formatDisplayDate(
+      `${c.start.getFullYear()}-${String(c.start.getMonth() + 1).padStart(2, "0")}-${String(c.start.getDate()).padStart(2, "0")}`,
+    );
+    const end = formatDisplayDate(
+      `${c.end.getFullYear()}-${String(c.end.getMonth() + 1).padStart(2, "0")}-${String(c.end.getDate()).padStart(2, "0")}`,
+    );
+    const range = start === end ? start : `${start} to ${end}`;
+    return `- ${leaveTypeLabel(c.type)}: ${c.days} day(s) on ${range} (${c.status})`;
+  });
+  return [
+    "This leave request overlaps with existing leave:",
+    ...lines,
+    "",
+    "Please ask your manager/Exco to edit or cancel the overlapping leave, or try another date.",
+  ].join("\n");
+}
+
 function setupLeaveForm() {
   const form = document.getElementById("leave-form");
   if (!form) return;
@@ -965,6 +1054,19 @@ function setupLeaveForm() {
         "leave-form-error",
         `Not enough ${type} leave. Available: ${remaining.toFixed(2)} days, requested: ${days.toFixed(2)} days.`,
       );
+      return;
+    }
+
+    const existingRequests = await loadLeaveRequests();
+    const clashes = findLeaveClashesLocal({
+      employeeId,
+      dateISO,
+      days,
+      employeeTransactions: emp.transactions || [],
+      leaveRequests: existingRequests,
+    });
+    if (clashes.length) {
+      showError("leave-form-error", formatClashMessageLocal(clashes));
       return;
     }
 
@@ -1055,6 +1157,92 @@ function setupUsersAdmin() {
       alert(`User created: ${data.email} (${data.role})`);
     } catch (err) {
       showError("user-form-error", err.message || "Could not create user.");
+    }
+  });
+
+  const tbody = document.getElementById("users-tbody");
+  if (tbody) {
+    tbody.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".btn-reset-password");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      const email = btn.getAttribute("data-email") || "this user";
+      if (!id) return;
+
+      const custom = window.prompt(
+        `Reset password for ${email}.\n\nLeave blank to auto-generate a temporary password, or type a new temporary password (min 8 characters):`,
+        "",
+      );
+      if (custom === null) return;
+      const password = custom.trim();
+      if (password && password.length < 8) {
+        alert("Temporary password must be at least 8 characters.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/users/${id}/reset-password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(password ? { password } : {}),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not reset password.");
+        alert(
+          `Password reset for ${data.user?.email || email}.\n\nTemporary password: ${data.temporaryPassword}\n\nIt was also emailed to the user (if SMTP is configured).`,
+        );
+      } catch (err) {
+        alert(err.message || "Could not reset password.");
+      }
+    });
+  }
+}
+
+function setupChangePassword() {
+  const openBtn = document.getElementById("change-password-btn");
+  const overlay = document.getElementById("password-modal-overlay");
+  const form = document.getElementById("change-password-form");
+  if (!openBtn || !overlay || !form) return;
+
+  const close = () => {
+    overlay.classList.remove("open");
+    form.reset();
+    showError("password-form-error", "");
+  };
+
+  openBtn.addEventListener("click", () => {
+    showError("password-form-error", "");
+    form.reset();
+    overlay.classList.add("open");
+  });
+  document.getElementById("password-modal-close")?.addEventListener("click", close);
+  document.getElementById("password-modal-cancel")?.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    showError("password-form-error", "");
+    const currentPassword = document.getElementById("pw-current").value;
+    const newPassword = document.getElementById("pw-new").value;
+    const confirmPassword = document.getElementById("pw-confirm").value;
+    if (newPassword !== confirmPassword) {
+      showError("password-form-error", "New password and confirmation do not match.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not change password.");
+      close();
+      alert("Password updated.");
+    } catch (err) {
+      showError("password-form-error", err.message || "Could not change password.");
     }
   });
 }
@@ -1441,6 +1629,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   applyBrand(brand);
   applyRoleVisibility(user);
   setupLogout();
+  setupChangePassword();
   renderCurrentDate();
 
   const employees = await loadEmployees();

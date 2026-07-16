@@ -109,9 +109,33 @@
         color: var(--muted);
         line-height: 1.45;
       }
+      .forgot-link {
+        display: inline-block;
+        margin: 10px 0 0;
+        font-size: 0.88rem;
+        color: var(--accent);
+        background: none;
+        border: none;
+        padding: 0;
+        width: auto;
+        font-weight: 500;
+        cursor: pointer;
+        text-align: left;
+      }
+      .forgot-link:hover {
+        background: none;
+        text-decoration: underline;
+      }
+      .success {
+        display: none;
+        color: #276749;
+        margin: 0 0 12px;
+        font-size: 0.9rem;
+      }
       #local-login-block[hidden],
       #google-login-block[hidden],
-      #auth-divider[hidden] {
+      #auth-divider[hidden],
+      #forgot-block[hidden] {
         display: none !important;
       }
     </style>
@@ -123,6 +147,7 @@
         Sign in with your company account.
       </p>
       <div id="login-error" class="error"></div>
+      <div id="login-success" class="success"></div>
 
       <div id="google-login-block" hidden>
         <a class="btn-google" id="google-login-btn" href="/api/auth/google">Sign in with Google</a>
@@ -137,6 +162,16 @@
           <input id="login-password" type="password" required autocomplete="current-password" />
           <button type="submit">Sign in with password</button>
         </form>
+        <button type="button" class="forgot-link" id="show-forgot-btn">Forgot password?</button>
+      </div>
+
+      <div id="forgot-block" hidden>
+        <form id="forgot-form">
+          <label for="forgot-email">Company email</label>
+          <input id="forgot-email" type="email" required autocomplete="username" placeholder="you@company.com" />
+          <button type="submit">Send reset link</button>
+        </form>
+        <button type="button" class="forgot-link" id="back-to-login-btn">Back to sign in</button>
       </div>
 
       <p class="hint">
@@ -147,6 +182,9 @@
     <script>
       function showError(msg) {
         const errorEl = document.getElementById("login-error");
+        const successEl = document.getElementById("login-success");
+        successEl.style.display = "none";
+        successEl.textContent = "";
         if (!msg) {
           errorEl.style.display = "none";
           errorEl.textContent = "";
@@ -154,6 +192,20 @@
         }
         errorEl.textContent = msg;
         errorEl.style.display = "block";
+      }
+
+      function showSuccess(msg) {
+        const errorEl = document.getElementById("login-error");
+        const successEl = document.getElementById("login-success");
+        errorEl.style.display = "none";
+        errorEl.textContent = "";
+        if (!msg) {
+          successEl.style.display = "none";
+          successEl.textContent = "";
+          return;
+        }
+        successEl.textContent = msg;
+        successEl.style.display = "block";
       }
 
       async function loadBrand() {
@@ -169,18 +221,22 @@
         } catch {}
       }
 
+      let localLoginEnabled = true;
+
       async function loadAuthOptions() {
         const googleBlock = document.getElementById("google-login-block");
         const localBlock = document.getElementById("local-login-block");
         const divider = document.getElementById("auth-divider");
+        const forgotBlock = document.getElementById("forgot-block");
         try {
           const res = await fetch("/api/auth/options", { cache: "no-store" });
           const opts = await res.json();
           const googleOn = Boolean(opts.googleEnabled);
           const localOn = opts.localEnabled !== false;
+          localLoginEnabled = localOn;
           googleBlock.hidden = !googleOn;
-          localBlock.hidden = !localOn;
-          divider.hidden = !(googleOn && localOn);
+          localBlock.hidden = !localOn || !forgotBlock.hidden;
+          divider.hidden = !(googleOn && localOn) || !forgotBlock.hidden;
           if (googleOn && !localOn) {
             document.getElementById("login-subtitle").textContent =
               "Sign in with your company Google Workspace account.";
@@ -198,12 +254,39 @@
           googleBlock.hidden = true;
           divider.hidden = true;
           localBlock.hidden = false;
+          localLoginEnabled = true;
         }
       }
+
+      function showForgotView() {
+        if (!localLoginEnabled) return;
+        showError("");
+        showSuccess("");
+        document.getElementById("google-login-block").hidden = true;
+        document.getElementById("auth-divider").hidden = true;
+        document.getElementById("local-login-block").hidden = true;
+        document.getElementById("forgot-block").hidden = false;
+        document.getElementById("login-subtitle").textContent =
+          "Enter your company email and we will send a password reset link.";
+        const loginEmail = document.getElementById("login-email").value.trim();
+        if (loginEmail) document.getElementById("forgot-email").value = loginEmail;
+      }
+
+      function showLoginView() {
+        showError("");
+        showSuccess("");
+        document.getElementById("forgot-block").hidden = true;
+        document.getElementById("local-login-block").hidden = !localLoginEnabled;
+        loadAuthOptions();
+      }
+
+      document.getElementById("show-forgot-btn").addEventListener("click", showForgotView);
+      document.getElementById("back-to-login-btn").addEventListener("click", showLoginView);
 
       document.getElementById("login-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         showError("");
+        showSuccess("");
         const email = document.getElementById("login-email").value.trim();
         const password = document.getElementById("login-password").value;
         try {
@@ -220,11 +303,36 @@
         }
       });
 
+      document.getElementById("forgot-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        showError("");
+        showSuccess("");
+        const email = document.getElementById("forgot-email").value.trim();
+        try {
+          const res = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not request password reset.");
+          showSuccess(data.message || "If an account exists for that email, a password reset link has been sent.");
+        } catch (err) {
+          showError(err.message || "Could not request password reset.");
+        }
+      });
+
       const params = new URLSearchParams(window.location.search);
       if (params.get("error")) showError(params.get("error"));
-
-      loadBrand();
-      loadAuthOptions();
+      if (params.get("forgot") === "1") {
+        // show after options load
+        loadBrand().then(loadAuthOptions).then(() => {
+          if (localLoginEnabled) showForgotView();
+        });
+      } else {
+        loadBrand();
+        loadAuthOptions();
+      }
     </script>
   </body>
 </html>

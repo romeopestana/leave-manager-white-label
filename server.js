@@ -7,7 +7,8 @@ const { Pool } = require("pg");
 const { readStore, writeStore } = require("./lib/fileStore");
 const users = require("./lib/users");
 const leaveRequests = require("./lib/leaveRequests");
-const { notify, smtpConfigured } = require("./lib/notifications");
+const leaveOverlap = require("./lib/leaveOverlap");
+const { notify, smtpConfigured, loginUrl, appBaseUrl } = require("./lib/notifications");
 const googleAuth = require("./lib/googleAuth");
 
 function loadEnvFileIfPresent() {
@@ -399,6 +400,77 @@ app.post("/api/auth/logout", (req, res) => {
   });
 });
 
+app.post("/api/auth/change-password", requireAuth, async (req, res) => {
+  try {
+    const opts = authOptions();
+    if (!opts.localEnabled) {
+      return res.status(403).json({ error: "Password login is disabled for this company." });
+    }
+    const user = currentUser(req);
+    const { currentPassword, newPassword, confirmPassword } = req.body || {};
+    if (confirmPassword != null && String(confirmPassword) !== String(newPassword || "")) {
+      return res.status(400).json({ error: "New password and confirmation do not match." });
+    }
+    await users.changePassword(user.id, { currentPassword, newPassword });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
+});
+
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const genericMessage =
+    "If an account exists for that email, a password reset link has been sent.";
+  try {
+    const opts = authOptions();
+    if (!opts.localEnabled) {
+      return res.status(403).json({ error: "Password login is disabled for this company." });
+    }
+    const email = req.body?.email;
+    const result = await users.createPasswordResetToken(email, companyDomains());
+    if (result) {
+      const resetLink = `${appBaseUrl()}/reset-password.html?token=${encodeURIComponent(result.token)}`;
+      await notify({
+        to: result.user.email,
+        subject: "Reset your Leave Manager password",
+        body: [
+          `Hello ${result.user.name || result.user.email},`,
+          "",
+          "A password reset was requested for your Leave Manager account.",
+          `Open this link within 1 hour to choose a new password:`,
+          resetLink,
+          "",
+          "If you did not request this, you can ignore this email.",
+          `Sign in: ${loginUrl()}`,
+        ].join("\n"),
+        meta: { type: "password_reset", userId: result.user.id },
+      });
+    }
+    res.json({ ok: true, message: genericMessage });
+  } catch (err) {
+    // Still return a generic success to avoid account enumeration via errors.
+    console.error("[forgot-password]", err.message || err);
+    res.json({ ok: true, message: genericMessage });
+  }
+});
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  try {
+    const opts = authOptions();
+    if (!opts.localEnabled) {
+      return res.status(403).json({ error: "Password login is disabled for this company." });
+    }
+    const { token, password, confirmPassword } = req.body || {};
+    if (confirmPassword != null && String(confirmPassword) !== String(password || "")) {
+      return res.status(400).json({ error: "New password and confirmation do not match." });
+    }
+    await users.resetPasswordWithToken(token, password);
+    res.json({ ok: true, message: "Password updated. You can sign in now." });
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
+});
+
 // -------- Users API (Admin) --------
 app.get("/api/users", requireAuth, requireRole("admin"), (req, res) => {
   res.json(users.listUsers());
@@ -407,10 +479,18 @@ app.get("/api/users", requireAuth, requireRole("admin"), (req, res) => {
 app.post("/api/users", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const created = await users.createUser(req.body || {}, companyDomains());
+    const tempPassword = req.body?.password ? String(req.body.password) : "";
     await notify({
       to: created.email,
       subject: "Leave Manager account created",
-      body: `An account was created for you with role: ${created.role}. Sign in at /login.html using your company email (password and/or Google, depending on company settings).`,
+      body: [
+        `An account was created for you with role: ${created.role}.`,
+        `Sign in at ${loginUrl()} using your company email.`,
+        tempPassword ? `Temporary password: ${tempPassword}` : "",
+        "Please change your password after signing in.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       meta: { type: "user_created", userId: created.id },
     });
     res.status(201).json(created);
@@ -422,13 +502,56 @@ app.post("/api/users", requireAuth, requireRole("admin"), async (req, res) => {
 app.put("/api/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
   try {
     const updated = await users.updateUser(req.params.id, req.body || {}, companyDomains());
+    const bodyLines = [
+      `Your account was updated. Role: ${updated.role}. Active: ${updated.active}.`,
+      `Sign in: ${loginUrl()}`,
+    ];
+    if (req.body?.password) {
+      bodyLines.push(`Your password was reset by an Admin.`);
+      bodyLines.push(`Temporary password: ${String(req.body.password)}`);
+      bodyLines.push("Please change your password after signing in.");
+    }
     await notify({
       to: updated.email,
       subject: "Leave Manager account updated",
-      body: `Your account was updated. Role: ${updated.role}. Active: ${updated.active}.`,
+      body: bodyLines.join("\n"),
       meta: { type: "user_updated", userId: updated.id },
     });
     res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: String(err.message || err) });
+  }
+});
+
+app.post("/api/users/:id/reset-password", requireAuth, requireRole("admin"), async (req, res) => {
+  try {
+    const opts = authOptions();
+    if (!opts.localEnabled) {
+      return res.status(403).json({ error: "Password login is disabled for this company." });
+    }
+    const requested = req.body?.password ? String(req.body.password) : "";
+    const { user: updated, password } = await users.adminResetPassword(
+      req.params.id,
+      requested || undefined,
+    );
+    await notify({
+      to: updated.email,
+      subject: "Your Leave Manager password was reset",
+      body: [
+        `Hello ${updated.name || updated.email},`,
+        "",
+        "An Admin reset your Leave Manager password.",
+        `Temporary password: ${password}`,
+        `Sign in at ${loginUrl()} and change your password after signing in.`,
+      ].join("\n"),
+      meta: { type: "admin_password_reset", userId: updated.id },
+    });
+    res.json({
+      ok: true,
+      user: updated,
+      // Return temp password so Admin can copy it if email delivery fails.
+      temporaryPassword: password,
+    });
   } catch (err) {
     res.status(400).json({ error: String(err.message || err) });
   }
@@ -520,6 +643,26 @@ app.post("/api/leave-requests", requireAuth, requireRole("admin", "employee"), a
     const allEmployees = await loadEmployees();
     const emp = allEmployees.find((e) => e.id === employeeId);
     if (!emp) return res.status(400).json({ error: "Employee not found." });
+
+    const clashes = leaveOverlap.findLeaveClashes({
+      employeeId,
+      dateISO,
+      days,
+      employeeTransactions: emp.transactions || [],
+      leaveRequests: leaveRequests.listLeaveRequests(),
+    });
+    if (clashes.length) {
+      return res.status(409).json({
+        error: leaveOverlap.formatClashMessage(clashes),
+        clashes: clashes.map((c) => ({
+          type: c.type,
+          days: c.days,
+          status: c.status,
+          start: leaveOverlap.formatDateDisplay(c.start),
+          end: leaveOverlap.formatDateDisplay(c.end),
+        })),
+      });
+    }
 
     const request = leaveRequests.createLeaveRequest({
       employeeId,
