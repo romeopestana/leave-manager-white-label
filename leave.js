@@ -34,7 +34,7 @@ function applyRoleVisibility(user) {
   const deleteBtn = document.getElementById("manage-delete-btn");
   if (deleteBtn) deleteBtn.style.display = isAdmin ? "" : "none";
 
-  setShown("leave-request-panel", isAdmin || isEmployee);
+  setShown("leave-request-panel", isAdmin || isEmployee || isExco);
   setShown("leave-approvals-panel", isExco || isAdmin || isEmployee);
   setShown("reporting-section", isAdmin || isExco);
   setShown("reporting-panel", isAdmin || isExco);
@@ -646,7 +646,13 @@ function renderEmployeeSelect(employees) {
   placeholder.textContent = "Select employee";
   sel.appendChild(placeholder);
 
-  const sorted = sortEmployeesByFirstName(employees);
+  let list = employees;
+  const role = currentUser?.role;
+  if ((role === "employee" || role === "exco") && currentUser?.employeeId) {
+    list = employees.filter((e) => e.id === currentUser.employeeId);
+  }
+
+  const sorted = sortEmployeesByFirstName(list);
   for (const emp of sorted) {
     const opt = document.createElement("option");
     opt.value = emp.id;
@@ -654,8 +660,10 @@ function renderEmployeeSelect(employees) {
     sel.appendChild(opt);
   }
 
-  if (employees.some((e) => e.id === currentValue)) {
+  if (list.some((e) => e.id === currentValue)) {
     sel.value = currentValue;
+  } else if (list.length === 1) {
+    sel.value = list[0].id;
   }
 }
 

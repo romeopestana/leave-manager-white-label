@@ -629,15 +629,15 @@ app.get("/api/leave-requests", requireAuth, (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/leave-requests", requireAuth, requireRole("admin", "employee"), async (req, res) => {
+app.post("/api/leave-requests", requireAuth, requireRole("admin", "employee", "exco"), async (req, res) => {
   try {
     const user = currentUser(req);
     const { employeeId, type, days, dateISO } = req.body || {};
     if (!employeeId || !type || !days || !dateISO) {
       return res.status(400).json({ error: "employeeId, type, days, and dateISO are required." });
     }
-    if (user.role === "employee" && user.employeeId && user.employeeId !== employeeId) {
-      return res.status(403).json({ error: "Employees can only request leave for themselves." });
+    if ((user.role === "employee" || user.role === "exco") && user.employeeId && user.employeeId !== employeeId) {
+      return res.status(403).json({ error: "You can only request leave for yourself." });
     }
 
     const allEmployees = await loadEmployees();
