@@ -1,5 +1,6 @@
 import {
   applyAnnualBalancePolicy,
+  clampManagedLeaveToPolicy,
   getCountryOptions,
   getMaxAccumulationDays,
   getPolicyDocumentLinks,
@@ -460,13 +461,17 @@ function annualTakenInYear(txs, year, asOfDate) {
 
 /**
  * Annual balance with end-of-month accrual and year-end carry-over cap.
- * Carry-over is applied when entering the next calendar year:
- * unused annual above annualMaxCarryOver is forfeited.
+ * Hard accumulation caps (e.g. ZA 25 days) apply as a ceiling on the final
+ * balance so Manage Employees can set any value up to the cap.
+ * Carry-over is applied when entering the next calendar year.
  */
 function getAnnualBalanceForEmployee(emp, asOfDate = new Date()) {
   const txs = Array.isArray(emp.transactions) ? emp.transactions : [];
   const rate = resolveAnnualAccrualPerMonth(emp, asOfDate);
   const carryCap = resolveYearEndCarryCap(emp, asOfDate);
+  const policy = getPolicyForEmployee(emp);
+  const hardCap =
+    policy?.capType === "hard" ? getMaxAccumulationDays(emp, asOfDate) : null;
 
   let balance = Number(emp.annualStart) || 0;
   const endYear = asOfDate.getFullYear();
@@ -479,6 +484,11 @@ function getAnnualBalanceForEmployee(emp, asOfDate = new Date()) {
     if (year < endYear && carryCap != null) {
       balance = Math.min(balance, carryCap);
     }
+  }
+
+  // Policy hard cap is a ceiling only (e.g. SA max 25 days).
+  if (hardCap != null) {
+    balance = Math.min(balance, hardCap);
   }
 
   return balance;
@@ -540,15 +550,100 @@ function getBalancesForEmployee(emp, asOfDate = new Date()) {
 
 /** Solve for annualStart so displayed annual balance matches a target value. */
 function resolveAnnualStartForTargetBalance(emp, targetAnnual, asOfDate = new Date()) {
-  let start = Number(emp.annualStart) || 0;
-  for (let i = 0; i < 30; i++) {
-    const trial = { ...emp, annualStart: start };
-    const bal = getBalancesForEmployee(trial, asOfDate).annual;
-    const diff = targetAnnual - bal;
-    if (Math.abs(diff) < 0.005) break;
-    start += diff;
+  let target = round2(Math.max(0, Number(targetAnnual) || 0));
+  const policy = getPolicyForEmployee(emp);
+  const hardCap =
+    policy?.capType === "hard" ? getMaxAccumulationDays(emp, asOfDate) : null;
+  // South Africa (and other hard-cap countries): any value up to the cap is allowed.
+  if (hardCap != null) target = Math.min(target, hardCap);
+
+  const rate = resolveAnnualAccrualPerMonth(emp, asOfDate);
+  const txs = Array.isArray(emp.transactions) ? emp.transactions : [];
+  const year = asOfDate.getFullYear();
+  const leave = annualTakenInYear(txs, year, asOfDate);
+  const accrued = rate * completedAccrualMonthsInYear(year, asOfDate);
+
+  return round2(target + leave - accrued);
+}
+
+/**
+ * Apply manage-form values to an employee, respecting leave policy limits.
+ * Returns { employees, updatedEmp, afterBalances, adjustments, appliedAnnual }.
+ */
+async function saveManagedEmployeeUpdate(employeeId, fields) {
+  let {
+    name,
+    country,
+    startDisplay,
+    userAnnual,
+    userSick,
+    userFamily,
+    userStudy,
+    userReligious,
+    accrualInput,
+    annualMaxCarryOver,
+  } = fields;
+
+  const policyEmp = { country, name, startDisplay };
+  const clampValues = { annual: userAnnual, accrual: accrualInput };
+  if (annualMaxCarryOver != null) clampValues.maxCarry = annualMaxCarryOver;
+  const clamped = clampManagedLeaveToPolicy(policyEmp, clampValues);
+  const adjustments = clamped.adjustments.slice();
+  userAnnual = clamped.annual;
+  const accrual = clamped.accrual;
+  if (annualMaxCarryOver != null) annualMaxCarryOver = clamped.maxCarry;
+
+  let employees = await loadEmployees();
+  const currentEmp = employees.find((e) => e.id === employeeId);
+  if (!currentEmp) throw new Error("Employee not found.");
+
+  const taken = getLeaveTakenForEmployee(currentEmp);
+  const empForSolve = {
+    ...currentEmp,
+    country,
+    startDisplay,
+    annualAccrualPerMonth: accrual,
+    ...(annualMaxCarryOver != null ? { annualMaxCarryOver } : {}),
+  };
+
+  const appliedAnnual = userAnnual;
+  const resolvedAnnualStart = resolveAnnualStartForTargetBalance(
+    empForSolve,
+    appliedAnnual,
+  );
+
+  const updatePayload = {
+    name,
+    country,
+    startDisplay,
+    annualStart: resolvedAnnualStart,
+    sickStart: userSick + taken.sickTaken,
+    familyStart: userFamily + taken.familyTaken,
+    studyStart: userStudy + taken.studyTaken,
+    religiousStart: userReligious + taken.religiousTaken,
+    annualAccrualPerMonth: accrual,
+  };
+  if (annualMaxCarryOver != null) {
+    updatePayload.annualMaxCarryOver = annualMaxCarryOver;
   }
-  return start;
+
+  employees = updateEmployee(employees, employeeId, updatePayload);
+  await saveEmployees(employees);
+
+  // Reload so the balances table always reflects persisted values.
+  employees = await loadEmployees();
+  const updatedEmp = employees.find((e) => e.id === employeeId);
+  const afterBalances = updatedEmp ? getBalancesForEmployee(updatedEmp) : null;
+
+  return {
+    employees,
+    updatedEmp,
+    afterBalances,
+    adjustments,
+    appliedAnnual,
+    accrual,
+    annualMaxCarryOver,
+  };
 }
 
 function getLeaveTakenForEmployee(emp, asOfDate = new Date()) {
@@ -640,6 +735,9 @@ function renderEmployeesTable(employees) {
     const annualTd = document.createElement("td");
     annualTd.className = "cell-small";
     annualTd.textContent = balances.annual.toFixed(2);
+    if (balances.policyCapped || (balances.annualRaw != null && balances.annualRaw > balances.annual + 0.001)) {
+      annualTd.title = `Uncapped running total: ${balances.annualRaw.toFixed(2)} days`;
+    }
 
     const sickTd = document.createElement("td");
     sickTd.className = "cell-small";
@@ -1362,11 +1460,6 @@ function setupManageEmployee() {
       const userReligious = parseDecimal(document.getElementById("manage-emp-religious").value);
       const country = document.getElementById("manage-emp-country")?.value || inferCountryFromName(name) || "";
       const accrualInput = parseDecimal(document.getElementById("manage-emp-accrual").value);
-      const policyAccrual = getStatutoryAccrualPerMonth(
-        { country, startDisplay: startText },
-        new Date(),
-      );
-      const accrual = round2(Math.max(accrualInput, policyAccrual));
       const annualMaxCarryOver = parseDecimal(document.getElementById("manage-emp-max-carry").value);
 
       if (!name) {
@@ -1387,122 +1480,134 @@ function setupManageEmployee() {
         userFamily < 0 ||
         userStudy < 0 ||
         userReligious < 0 ||
-        accrual < 0 ||
+        accrualInput < 0 ||
         annualMaxCarryOver < 0
       ) {
         showError("manage-form-error", "All leave values must be zero or positive.");
         return;
       }
 
-      let employees = await loadEmployees();
-      const currentEmp = employees.find((e) => e.id === id);
-      if (!currentEmp) return;
-      const beforeBalances = getBalancesForEmployee(currentEmp);
-      const taken = getLeaveTakenForEmployee(currentEmp);
-      const empForSolve = {
-        ...currentEmp,
-        country,
-        annualAccrualPerMonth: accrual,
-        annualMaxCarryOver,
-      };
-      const resolvedAnnualStart = resolveAnnualStartForTargetBalance(
-        empForSolve,
-        userAnnual,
-      );
+      try {
+        const currentEmp = (await loadEmployees()).find((e) => e.id === id);
+        const beforeBalances = currentEmp ? getBalancesForEmployee(currentEmp) : null;
 
-      employees = updateEmployee(employees, id, {
-        name,
-        country,
-        startDisplay: startText,
-        annualStart: resolvedAnnualStart,
-        sickStart: userSick + taken.sickTaken,
-        familyStart: userFamily + taken.familyTaken,
-        studyStart: userStudy + taken.studyTaken,
-        religiousStart: userReligious + taken.religiousTaken,
-        annualAccrualPerMonth: accrual,
-        annualMaxCarryOver,
-      });
-      await saveEmployees(employees);
+        const result = await saveManagedEmployeeUpdate(id, {
+          name,
+          country,
+          startDisplay: startText,
+          userAnnual,
+          userSick,
+          userFamily,
+          userStudy,
+          userReligious,
+          accrualInput,
+          annualMaxCarryOver,
+        });
 
-      const updatedEmp = employees.find((e) => e.id === id);
-      const afterBalances = updatedEmp ? getBalancesForEmployee(updatedEmp) : null;
-      const changes = [];
-      if ((currentEmp.name || "") !== name) changes.push(`Name: ${currentEmp.name || ""} → ${name}`);
-      if ((currentEmp.startDisplay || "") !== startText) {
-        changes.push(`Start date: ${currentEmp.startDisplay || ""} → ${startText}`);
-      }
-      if (beforeBalances && afterBalances) {
-        for (const key of ["annual", "sick", "family", "study", "religious"]) {
-          if (Number(beforeBalances[key]) !== Number(afterBalances[key])) {
-            changes.push(
-              `${key}: ${Number(beforeBalances[key]).toFixed(2)} → ${Number(afterBalances[key]).toFixed(2)}`,
-            );
+        const {
+          employees,
+          updatedEmp,
+          afterBalances,
+          adjustments,
+          accrual,
+          annualMaxCarryOver: savedCarry,
+        } = result;
+
+        if (adjustments.length) {
+          alert(adjustments.map((a) => a.message).join("\n"));
+        }
+
+        const changes = [];
+        if (currentEmp && (currentEmp.name || "") !== name) {
+          changes.push(`Name: ${currentEmp.name || ""} → ${name}`);
+        }
+        if (currentEmp && (currentEmp.startDisplay || "") !== startText) {
+          changes.push(`Start date: ${currentEmp.startDisplay || ""} → ${startText}`);
+        }
+        if (currentEmp && (currentEmp.country || "") !== country) {
+          changes.push(`Country: ${currentEmp.country || ""} → ${country}`);
+        }
+        if (beforeBalances && afterBalances) {
+          for (const key of ["annual", "sick", "family", "study", "religious"]) {
+            if (Number(beforeBalances[key]) !== Number(afterBalances[key])) {
+              changes.push(
+                `${key}: ${Number(beforeBalances[key]).toFixed(2)} → ${Number(afterBalances[key]).toFixed(2)}`,
+              );
+            }
           }
         }
-      }
-      if (Number(currentEmp.annualAccrualPerMonth || 0) !== accrual) {
-        changes.push(
-          `Accrual/month: ${Number(currentEmp.annualAccrualPerMonth || 0).toFixed(2)} → ${accrual.toFixed(2)}`,
-        );
-      }
-      if (Number(currentEmp.annualMaxCarryOver || 0) !== annualMaxCarryOver) {
-        changes.push(
-          `Max carry-over: ${Number(currentEmp.annualMaxCarryOver || 0).toFixed(2)} → ${annualMaxCarryOver.toFixed(2)}`,
-        );
-      }
-      if (!changes.length) changes.push("Profile saved with no numeric/name field differences detected.");
-
-      if (currentUser?.role === "exco") {
-        try {
-          const notifyRes = await fetch("/api/employees/profile-updated-notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              employeeId: id,
-              changes,
-              balances: afterBalances
-                ? {
-                    annual: afterBalances.annual.toFixed(2),
-                    sick: afterBalances.sick.toFixed(2),
-                    family: afterBalances.family.toFixed(2),
-                    study: afterBalances.study.toFixed(2),
-                    religious: afterBalances.religious.toFixed(2),
-                    accrual: accrual.toFixed(2),
-                    maxCarry: annualMaxCarryOver.toFixed(2),
-                  }
-                : null,
-            }),
-          });
-          const notifyData = await notifyRes.json();
-          if (!notifyRes.ok) {
-            alert(
-              "Profile saved, but email notification failed: " +
-                (notifyData.error || "unknown error") +
-                ". Ensure the employee has a linked user email.",
-            );
-          }
-        } catch (err) {
-          alert("Profile saved, but email notification could not be sent.");
+        if (currentEmp && Number(currentEmp.annualAccrualPerMonth || 0) !== accrual) {
+          changes.push(
+            `Accrual/month: ${Number(currentEmp.annualAccrualPerMonth || 0).toFixed(2)} → ${accrual.toFixed(2)}`,
+          );
         }
-      }
+        if (currentEmp && Number(currentEmp.annualMaxCarryOver || 0) !== savedCarry) {
+          changes.push(
+            `Max carry-over: ${Number(currentEmp.annualMaxCarryOver || 0).toFixed(2)} → ${savedCarry.toFixed(2)}`,
+          );
+        }
+        if (!changes.length) changes.push("Profile saved with no numeric/name field differences detected.");
 
-      logToServer({
-        action: "Updated",
-        employeeName: name,
-        startDate: startText,
-        annual: userAnnual,
-        sick: userSick,
-        family: userFamily,
-        study: userStudy,
-        religious: userReligious,
-        accrual,
-      });
-      renderEmployeesTable(employees);
-      renderEmployeeSelect(employees);
-      renderManageEmployeeSelect(employees);
-      renderReportEmployeeSelect(employees);
-      renderUserEmployeeLink(employees);
-      resetManageSection();
+        if (currentUser?.role === "exco") {
+          try {
+            const notifyRes = await fetch("/api/employees/profile-updated-notify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                employeeId: id,
+                changes,
+                balances: afterBalances
+                  ? {
+                      annual: afterBalances.annual.toFixed(2),
+                      sick: afterBalances.sick.toFixed(2),
+                      family: afterBalances.family.toFixed(2),
+                      study: afterBalances.study.toFixed(2),
+                      religious: afterBalances.religious.toFixed(2),
+                      accrual: accrual.toFixed(2),
+                      maxCarry: savedCarry.toFixed(2),
+                    }
+                  : null,
+              }),
+            });
+            const notifyData = await notifyRes.json();
+            if (!notifyRes.ok) {
+              alert(
+                "Profile saved, but email notification failed: " +
+                  (notifyData.error || "unknown error") +
+                  ". Ensure the employee has a linked user email.",
+              );
+            }
+          } catch (err) {
+            alert("Profile saved, but email notification could not be sent.");
+          }
+        }
+
+        logToServer({
+          action: "Updated",
+          employeeName: name,
+          startDate: startText,
+          annual: afterBalances ? afterBalances.annual : userAnnual,
+          sick: userSick,
+          family: userFamily,
+          study: userStudy,
+          religious: userReligious,
+          accrual,
+        });
+        renderEmployeesTable(employees);
+        renderEmployeeSelect(employees);
+        renderManageEmployeeSelect(employees);
+        renderReportEmployeeSelect(employees);
+        renderUserEmployeeLink(employees);
+        if (updatedEmp) {
+          const sel = document.getElementById("manage-employee-select");
+          if (sel) sel.value = updatedEmp.id;
+          populateManageForm(updatedEmp);
+        } else {
+          resetManageSection();
+        }
+      } catch (err) {
+        showError("manage-form-error", err.message || "Could not save employee.");
+      }
     });
   }
 

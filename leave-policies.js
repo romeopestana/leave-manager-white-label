@@ -167,6 +167,66 @@ export function getMaxAccumulationDays(emp, asOfDate = new Date()) {
   return null;
 }
 
+/**
+ * Clamp manage/create form leave values to country policy limits.
+ * Hard accumulation caps (e.g. ZA 25 days) discard any excess annual/carry request.
+ * Accrual below the statutory minimum is raised to that minimum.
+ */
+export function clampManagedLeaveToPolicy(emp, values = {}, asOfDate = new Date()) {
+  const policy = getPolicyForEmployee(emp);
+  const adjustments = [];
+  let annual =
+    values.annual == null ? null : round2(Math.max(0, Number(values.annual) || 0));
+  let maxCarry =
+    values.maxCarry == null
+      ? null
+      : round2(Math.max(0, Number(values.maxCarry) || 0));
+  let accrual =
+    values.accrual == null
+      ? null
+      : round2(Math.max(0, Number(values.accrual) || 0));
+
+  const statutoryAccrual = getStatutoryAccrualPerMonth(
+    { ...emp, country: emp.country || inferCountryFromName(emp.name) },
+    asOfDate,
+  );
+  if (accrual != null && accrual + 0.001 < statutoryAccrual) {
+    adjustments.push({
+      field: "accrual",
+      requested: accrual,
+      applied: statutoryAccrual,
+      message: `Accrual raised to ${statutoryAccrual.toFixed(2)}/mo (${policy?.name || "policy"} minimum).`,
+    });
+    accrual = statutoryAccrual;
+  }
+
+  if (policy?.capType === "hard") {
+    const max = getMaxAccumulationDays(emp, asOfDate);
+    if (max != null) {
+      if (annual != null && annual > max) {
+        adjustments.push({
+          field: "annual",
+          requested: annual,
+          applied: max,
+          message: `Annual leave capped at ${max} days per ${policy.name} policy (requested ${annual.toFixed(2)}; excess discarded).`,
+        });
+        annual = max;
+      }
+      if (maxCarry != null && maxCarry > max) {
+        adjustments.push({
+          field: "maxCarry",
+          requested: maxCarry,
+          applied: max,
+          message: `Max carry-over capped at ${max} days per ${policy.name} policy (requested ${maxCarry.toFixed(2)}; excess discarded).`,
+        });
+        maxCarry = max;
+      }
+    }
+  }
+
+  return { annual, maxCarry, accrual, adjustments, policy };
+}
+
 export function applyAnnualBalancePolicy(emp, rawAnnualBalance, asOfDate = new Date()) {
   const policy = getPolicyForEmployee(emp);
   if (!policy) {
@@ -188,8 +248,9 @@ export function applyAnnualBalancePolicy(emp, rawAnnualBalance, asOfDate = new D
       level: "critical",
       message: `Balance exceeds ${maxAccumulation}-day ${policy.name} accumulation cap.`,
     });
-    balance = maxAccumulation;
-    capped = true;
+    // Hard caps are enforced in the balance engine (forfeit after accrual,
+    // before leave). Do not re-clamp here or approved leave would not show
+    // while the uncapped running total is still above the cap.
   }
 
   if (maxAccumulation != null && rules.capType === "postponement" && balance > maxAccumulation) {
