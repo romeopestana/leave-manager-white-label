@@ -1,3 +1,17 @@
+import {
+  applyAnnualBalancePolicy,
+  getCountryOptions,
+  getMaxAccumulationDays,
+  getPolicyDocumentLinks,
+  getPolicyForEmployee,
+  getStatutoryAccrualPerMonth,
+  inferCountryFromName,
+  initLeavePolicies,
+  migrateEmployeesToPolicies,
+  resolveAnnualAccrualPerMonth,
+  round2,
+} from "./leave-policies.js";
+
 let currentUser = null;
 
 async function fetchCurrentUser() {
@@ -67,7 +81,7 @@ function renderLeaveRequests(requests) {
     return;
   }
 
-  const canDecide = currentUser?.role === "exco";
+  const canDecide = currentUser?.role === "exco" || currentUser?.role === "admin";
   for (const req of requests) {
     const tr = document.createElement("tr");
     const dateStr = req.dateISO ? String(req.dateISO).slice(0, 10) : "";
@@ -309,9 +323,11 @@ async function importEmployees(employees) {
 
 function createEmployee(data) {
   const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+  const country = data.country || inferCountryFromName(data.name) || "";
   return {
     id,
     name: data.name,
+    country,
     startDisplay: data.startDisplay, // MM/YY text
     annualStart: data.annualStart,
     sickStart: data.sickStart,
@@ -334,6 +350,7 @@ function updateEmployee(employees, employeeId, data) {
     id: emp.id,
     transactions: emp.transactions,
     name: data.name,
+    country: data.country || inferCountryFromName(data.name) || emp.country || "",
     startDisplay: data.startDisplay,
     annualStart: data.annualStart,
     sickStart: data.sickStart,
@@ -346,6 +363,16 @@ function updateEmployee(employees, employeeId, data) {
   const next = [...employees];
   next[idx] = updated;
   return next;
+}
+
+/** Year-end carry cap: policy hard cap takes precedence, else configured max carry-over. */
+function resolveYearEndCarryCap(emp, asOfDate = new Date()) {
+  const policy = getPolicyForEmployee(emp);
+  const policyMax = getMaxAccumulationDays(emp, asOfDate);
+  if (policy?.capType === "hard" && policyMax != null) {
+    return policyMax;
+  }
+  return parseCarryCap(emp.annualMaxCarryOver);
 }
 
 function deleteEmployee(employees, employeeId) {
@@ -438,8 +465,8 @@ function annualTakenInYear(txs, year, asOfDate) {
  */
 function getAnnualBalanceForEmployee(emp, asOfDate = new Date()) {
   const txs = Array.isArray(emp.transactions) ? emp.transactions : [];
-  const rate = Number(emp.annualAccrualPerMonth) || 0;
-  const carryCap = parseCarryCap(emp.annualMaxCarryOver);
+  const rate = resolveAnnualAccrualPerMonth(emp, asOfDate);
+  const carryCap = resolveYearEndCarryCap(emp, asOfDate);
 
   let balance = Number(emp.annualStart) || 0;
   const endYear = asOfDate.getFullYear();
@@ -492,20 +519,22 @@ function getBalancesForEmployee(emp, asOfDate = new Date()) {
     }
   }
 
-  const annual = getAnnualBalanceForEmployee(emp, asOfDate);
-  const sick = emp.sickStart - sickTaken;
-  const family = emp.familyStart - familyTaken;
-  const study = emp.studyStart - studyTaken;
-  const religious = emp.religiousStart - religiousTaken;
+  const annualRaw = getAnnualBalanceForEmployee(emp, asOfDate);
+  const policyResult = applyAnnualBalancePolicy(emp, annualRaw, asOfDate);
+  const accrualRate = resolveAnnualAccrualPerMonth(emp, asOfDate);
 
-  const clamp = (v) => Math.round((v + Number.EPSILON) * 100) / 100;
+  const clamp = (v) => round2(Math.max(0, v));
 
   return {
-    annual: clamp(Math.max(0, annual)),
-    sick: clamp(Math.max(0, sick)),
-    family: clamp(Math.max(0, family)),
-    study: clamp(Math.max(0, study)),
-    religious: clamp(Math.max(0, religious)),
+    annual: clamp(policyResult.balance),
+    annualRaw: clamp(annualRaw),
+    sick: clamp(emp.sickStart - sickTaken),
+    family: clamp(emp.familyStart - familyTaken),
+    study: clamp(emp.studyStart - studyTaken),
+    religious: clamp(emp.religiousStart - religiousTaken),
+    accrualRate,
+    policyWarnings: policyResult.warnings,
+    policyCapped: policyResult.capped,
   };
 }
 
@@ -562,6 +591,11 @@ function renderCurrentDate() {
   el.textContent = fmt;
 }
 
+function countryLabel(code) {
+  const policy = getPolicyForEmployee({ country: code, name: "" });
+  return policy ? policy.name : code || "—";
+}
+
 function renderEmployeesTable(employees) {
   const tbody = document.getElementById("employees-tbody");
   if (!tbody) return;
@@ -570,7 +604,7 @@ function renderEmployeesTable(employees) {
   if (!employees.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 9;
+    td.colSpan = 10;
     td.className = "muted";
     td.textContent = "No employees yet. Create one above.";
     tr.appendChild(td);
@@ -587,6 +621,17 @@ function renderEmployeesTable(employees) {
 
     const nameTd = document.createElement("td");
     nameTd.textContent = emp.name;
+    if (balances.policyWarnings?.length) {
+      const warn = document.createElement("span");
+      warn.className = "policy-warning-icon";
+      warn.title = balances.policyWarnings.map((w) => w.message).join("\n");
+      warn.textContent = " ⚠";
+      nameTd.appendChild(warn);
+    }
+
+    const countryTd = document.createElement("td");
+    countryTd.textContent = countryLabel(emp.country || inferCountryFromName(emp.name));
+    countryTd.className = "cell-small muted";
 
     const startTd = document.createElement("td");
     startTd.textContent = emp.startDisplay || "";
@@ -614,14 +659,18 @@ function renderEmployeesTable(employees) {
 
     const accrualTd = document.createElement("td");
     accrualTd.className = "cell-small muted";
-    accrualTd.textContent = (emp.annualAccrualPerMonth || 0).toFixed(2);
+    accrualTd.textContent = balances.accrualRate.toFixed(2);
+    if (balances.policyCapped) {
+      accrualTd.title = `Uncapped balance: ${balances.annualRaw.toFixed(2)} days`;
+    }
 
     const carryTd = document.createElement("td");
     carryTd.className = "cell-small muted";
-    const carry = parseCarryCap(emp.annualMaxCarryOver);
+    const carry = resolveYearEndCarryCap(emp, now);
     carryTd.textContent = carry == null ? "—" : carry.toFixed(2);
 
     tr.appendChild(nameTd);
+    tr.appendChild(countryTd);
     tr.appendChild(startTd);
     tr.appendChild(annualTd);
     tr.appendChild(sickTd);
@@ -749,8 +798,10 @@ function populateManageForm(emp) {
   document.getElementById("manage-emp-family").value = fmt(balances.family);
   document.getElementById("manage-emp-study").value = fmt(balances.study);
   document.getElementById("manage-emp-religious").value = fmt(balances.religious);
-  document.getElementById("manage-emp-accrual").value = fmt(emp.annualAccrualPerMonth);
+  document.getElementById("manage-emp-accrual").value = fmt(balances.accrualRate);
   document.getElementById("manage-emp-max-carry").value = fmt(emp.annualMaxCarryOver ?? 0);
+  const countryEl = document.getElementById("manage-emp-country");
+  if (countryEl) countryEl.value = emp.country || inferCountryFromName(emp.name) || "";
   formEl.style.display = "block";
   showError("manage-form-error", "");
 }
@@ -848,11 +899,18 @@ function setupEmployeeForm() {
     const familyStart = parseDecimal(document.getElementById("emp-family").value);
     const studyStart = parseDecimal(document.getElementById("emp-study").value);
     const religiousStart = parseDecimal(document.getElementById("emp-religious").value);
-    const accrual = parseDecimal(document.getElementById("emp-accrual").value);
+    const country = document.getElementById("emp-country")?.value || inferCountryFromName(name) || "";
+    const accrualInput = parseDecimal(document.getElementById("emp-accrual").value);
+    const policyAccrual = getStatutoryAccrualPerMonth({ country, startDisplay: startText }, new Date());
+    const accrual = round2(Math.max(accrualInput, policyAccrual));
     const annualMaxCarryOver = parseDecimal(document.getElementById("emp-max-carry").value);
 
     if (!name) {
       showError("employee-form-error", "Please enter an employee name.");
+      return;
+    }
+    if (!country) {
+      showError("employee-form-error", "Please select a work location (country).");
       return;
     }
     if (!mmYY) {
@@ -881,6 +939,7 @@ function setupEmployeeForm() {
     const employees = await loadEmployees();
     const newEmp = createEmployee({
       name,
+      country,
       startDisplay: startText,
       annualStart,
       sickStart,
@@ -1301,11 +1360,21 @@ function setupManageEmployee() {
       const userFamily = parseDecimal(document.getElementById("manage-emp-family").value);
       const userStudy = parseDecimal(document.getElementById("manage-emp-study").value);
       const userReligious = parseDecimal(document.getElementById("manage-emp-religious").value);
-      const accrual = parseDecimal(document.getElementById("manage-emp-accrual").value);
+      const country = document.getElementById("manage-emp-country")?.value || inferCountryFromName(name) || "";
+      const accrualInput = parseDecimal(document.getElementById("manage-emp-accrual").value);
+      const policyAccrual = getStatutoryAccrualPerMonth(
+        { country, startDisplay: startText },
+        new Date(),
+      );
+      const accrual = round2(Math.max(accrualInput, policyAccrual));
       const annualMaxCarryOver = parseDecimal(document.getElementById("manage-emp-max-carry").value);
 
       if (!name) {
         showError("manage-form-error", "Please enter an employee name.");
+        return;
+      }
+      if (!country) {
+        showError("manage-form-error", "Please select a work location (country).");
         return;
       }
       if (!mmYY) {
@@ -1332,6 +1401,7 @@ function setupManageEmployee() {
       const taken = getLeaveTakenForEmployee(currentEmp);
       const empForSolve = {
         ...currentEmp,
+        country,
         annualAccrualPerMonth: accrual,
         annualMaxCarryOver,
       };
@@ -1342,6 +1412,7 @@ function setupManageEmployee() {
 
       employees = updateEmployee(employees, id, {
         name,
+        country,
         startDisplay: startText,
         annualStart: resolvedAnnualStart,
         sickStart: userSick + taken.sickTaken,
@@ -1627,20 +1698,123 @@ function setupDecimalInputs() {
   }
 }
 
+function setupCountryFields() {
+  const options = getCountryOptions();
+  const selects = [
+    document.getElementById("emp-country"),
+    document.getElementById("manage-emp-country"),
+  ].filter(Boolean);
+
+  for (const sel of selects) {
+    sel.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select country";
+    sel.appendChild(placeholder);
+    for (const opt of options) {
+      const el = document.createElement("option");
+      el.value = opt.code;
+      el.textContent = opt.label;
+      sel.appendChild(el);
+    }
+  }
+
+  const empCountry = document.getElementById("emp-country");
+  const empAccrual = document.getElementById("emp-accrual");
+  const empStart = document.getElementById("emp-start");
+  const empName = document.getElementById("emp-name");
+
+  function syncCreateAccrualFromPolicy() {
+    if (!empCountry || !empAccrual) return;
+    const country = empCountry.value;
+    if (!country) return;
+    const startText = empStart?.value?.trim() || "";
+    const rate = getStatutoryAccrualPerMonth(
+      { country, startDisplay: startText },
+      new Date(),
+    );
+    empAccrual.value = rate.toFixed(2);
+  }
+
+  if (empCountry) {
+    empCountry.addEventListener("change", syncCreateAccrualFromPolicy);
+  }
+  if (empStart) {
+    empStart.addEventListener("change", syncCreateAccrualFromPolicy);
+    empStart.addEventListener("blur", syncCreateAccrualFromPolicy);
+  }
+  if (empName) {
+    empName.addEventListener("blur", () => {
+      if (!empCountry?.value) {
+        const inferred = inferCountryFromName(empName.value.trim());
+        if (inferred) {
+          empCountry.value = inferred;
+          syncCreateAccrualFromPolicy();
+        }
+      }
+    });
+  }
+}
+
+function setupPolicyLinks() {
+  const links = getPolicyDocumentLinks();
+  const jsonLink = document.getElementById("policy-json-link");
+  const docLink = document.getElementById("policy-doc-link");
+  const versionEl = document.getElementById("policy-version-label");
+
+  if (jsonLink) {
+    jsonLink.href = links.json;
+    jsonLink.title = `${links.title} (machine-readable rules)`;
+  }
+  if (docLink) {
+    docLink.href = links.document;
+    docLink.title = links.title;
+  }
+  if (versionEl) {
+    versionEl.textContent = `Policy v${links.version}`;
+  }
+}
+
+async function ensurePolicyMigration() {
+  const employees = await loadEmployees();
+  const { employees: migrated, changed } = migrateEmployeesToPolicies(employees);
+  if (changed) {
+    await saveEmployees(migrated);
+    logToServer({
+      action: "Policy Migration",
+      employeeName: `${migrated.length} employees updated to country policy accrual rates`,
+    });
+    return migrated;
+  }
+  return employees;
+}
+
 // --- Boot ---
 
 document.addEventListener("DOMContentLoaded", async () => {
   const user = await fetchCurrentUser();
   if (!user) return;
 
+  try {
+    await initLeavePolicies();
+  } catch (err) {
+    alert(
+      "Could not load leave policy configuration. Check that policy/annual-leave-policy.json is available.\n\n" +
+        (err.message || err),
+    );
+    return;
+  }
+
   const brand = await loadBrandConfig();
   applyBrand(brand);
   applyRoleVisibility(user);
   setupLogout();
   setupChangePassword();
+  setupPolicyLinks();
+  setupCountryFields();
   renderCurrentDate();
 
-  const employees = await loadEmployees();
+  const employees = await ensurePolicyMigration();
   renderEmployeesTable(employees);
   renderEmployeeSelect(employees);
   renderManageEmployeeSelect(employees);

@@ -94,6 +94,7 @@ async function initDb() {
       id UUID PRIMARY KEY,
       name TEXT NOT NULL,
       start_display TEXT NOT NULL,
+      country TEXT,
       annual_start DOUBLE PRECISION NOT NULL,
       sick_start DOUBLE PRECISION NOT NULL,
       family_start DOUBLE PRECISION NOT NULL,
@@ -123,6 +124,11 @@ async function initDb() {
 
     CREATE INDEX IF NOT EXISTS idx_transactions_employee_type_date
     ON transactions(employee_id, type, date_iso);
+  `);
+
+  await pool.query(`
+    ALTER TABLE employees
+    ADD COLUMN IF NOT EXISTS country TEXT;
   `);
 }
 
@@ -158,7 +164,7 @@ async function loadEmployees() {
 
   const empRes = await pool.query(`
     SELECT
-      id, name, start_display,
+      id, name, start_display, country,
       annual_start, sick_start, family_start, study_start, religious_start,
       annual_accrual_per_month, annual_max_carry_over, annual_override
     FROM employees
@@ -176,6 +182,7 @@ async function loadEmployees() {
       id: row.id,
       name: row.name,
       startDisplay: row.start_display,
+      country: row.country || "",
       annualStart: row.annual_start,
       sickStart: row.sick_start,
       familyStart: row.family_start,
@@ -221,15 +228,16 @@ async function saveEmployees(employees) {
       await pool.query(
         `
           INSERT INTO employees (
-            id, name, start_display,
+            id, name, start_display, country,
             annual_start, sick_start, family_start, study_start, religious_start,
             annual_accrual_per_month, annual_max_carry_over, annual_override
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         `,
         [
           emp.id,
           emp.name,
           emp.startDisplay,
+          emp.country || null,
           Number(emp.annualStart ?? 0),
           Number(emp.sickStart ?? 0),
           Number(emp.familyStart ?? 0),
@@ -702,7 +710,7 @@ app.post("/api/leave-requests", requireAuth, requireRole("admin", "employee", "e
   }
 });
 
-app.post("/api/leave-requests/:id/approve", requireAuth, requireRole("exco"), async (req, res) => {
+app.post("/api/leave-requests/:id/approve", requireAuth, requireRole("exco", "admin"), async (req, res) => {
   try {
     const user = currentUser(req);
     const updated = leaveRequests.setLeaveRequestStatus(req.params.id, {
@@ -719,7 +727,7 @@ app.post("/api/leave-requests/:id/approve", requireAuth, requireRole("exco"), as
   }
 });
 
-app.post("/api/leave-requests/:id/reject", requireAuth, requireRole("exco"), async (req, res) => {
+app.post("/api/leave-requests/:id/reject", requireAuth, requireRole("exco", "admin"), async (req, res) => {
   try {
     const user = currentUser(req);
     const updated = leaveRequests.setLeaveRequestStatus(req.params.id, {

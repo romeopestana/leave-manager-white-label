@@ -325,6 +325,16 @@
         cursor: default;
       }
 
+      a.btn {
+        text-decoration: none;
+      }
+
+      .policy-warning-icon {
+        color: #d97706;
+        cursor: help;
+        font-size: 11px;
+      }
+
       .table-wrap {
         border-radius: var(--radius-md);
         border: 1px solid var(--border-subtle);
@@ -482,6 +492,9 @@
             </div>
           </div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+            <span class="pill" id="policy-version-label">Policy v3</span>
+            <a class="btn btn-ghost" id="policy-doc-link" href="/policy/Axon%20Group%20Annual%20Leave%20Policy%20V3.docx" target="_blank" rel="noopener">Policy document</a>
+            <a class="btn btn-ghost" id="policy-json-link" href="/policy/annual-leave-policy.json" target="_blank" rel="noopener">Policy rules</a>
             <button type="button" class="btn btn-ghost" id="export-data-btn">Export backup</button>
             <button type="button" class="btn btn-ghost" id="import-data-btn">Import backup</button>
             <input type="file" id="import-file-input" accept=".json" style="display: none;" />
@@ -495,7 +508,8 @@
               <div>
                 <div class="card-title">Create Employee</div>
                 <div class="card-subtitle">
-                  Start balances are effective from 1&nbsp;Jan&nbsp;2026.
+                  Start balances are effective from 1&nbsp;Jan&nbsp;2026. Accrual
+                  rates follow each employee&apos;s work location (Policy V3).
                 </div>
               </div>
               <span class="highlight-chip">
@@ -515,6 +529,12 @@
                     placeholder="Jane Doe"
                     required
                   />
+                </div>
+                <div class="field">
+                  <label class="field-label">Work location <span>*</span></label>
+                  <select id="emp-country" class="select" required>
+                    <option value="">Select country</option>
+                  </select>
                 </div>
                 <div class="field">
                   <label class="field-label">Start date (MM/YY) <span>*</span></label>
@@ -784,7 +804,8 @@
               <div>
                 <div class="card-title">Employees &amp; Leave Balances</div>
                 <div class="card-subtitle">
-                  Annual accrues on month-end from Jan&nbsp;2026. Other leave resets on 1&nbsp;Jan.
+                  Annual accrues on month-end from Jan&nbsp;2026 per local
+                  statutory rules. Other leave resets on 1&nbsp;Jan.
                 </div>
               </div>
               <div class="badge">
@@ -797,6 +818,7 @@
                 <thead>
                   <tr>
                     <th>Employee</th>
+                    <th>Country</th>
                     <th>Start (MM/YY)</th>
                     <th>Annual</th>
                     <th>Sick</th>
@@ -809,7 +831,7 @@
                 </thead>
                 <tbody id="employees-tbody">
                   <tr>
-                    <td colspan="9" class="muted">
+                    <td colspan="10" class="muted">
                       No employees yet. Create one above.
                     </td>
                   </tr>
@@ -875,6 +897,12 @@
                 <div class="field">
                   <label class="field-label">Employee name <span>*</span></label>
                   <input class="input" type="text" id="manage-emp-name" placeholder="Jane Doe" required />
+                </div>
+                <div class="field">
+                  <label class="field-label">Work location <span>*</span></label>
+                  <select id="manage-emp-country" class="select" required>
+                    <option value="">Select country</option>
+                  </select>
                 </div>
                 <div class="field">
                   <label class="field-label">Start date (MM/YY) <span>*</span></label>

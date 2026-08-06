@@ -1,0 +1,111 @@
+{
+  "version": 3,
+  "title": "Axon Group Annual Leave Policy",
+  "effectiveFrom": "2026-01-01",
+  "sourceDocument": "Axon Group Annual Leave Policy V3.docx",
+  "lastUpdated": "2026-08-06",
+  "principles": [
+    "Lex Loci Laboris — local statutory minimums apply based on physical work location.",
+    "Favor Laboris — any term less favourable than local statute is void; local law prevails.",
+    "South Africa enforces a 25-day contractual accumulation cap; other jurisdictions use excessive-leave directives instead of hard forfeiture where prohibited."
+  ],
+  "entities": {
+    "ZA": "Axon Technologies PTY Ltd (South Africa)",
+    "GLOBAL": "Axon Global Trading Limited (Mauritius)"
+  },
+  "countries": {
+    "ZA": {
+      "code": "ZA",
+      "name": "South Africa",
+      "entity": "Axon Technologies PTY",
+      "statutoryDaysPerYear": 15,
+      "statutoryAccrualPerMonth": 1.25,
+      "groupPolicyDaysPerYear": 20,
+      "groupAccrualPerMonth": 1.67,
+      "accumulationCapDays": 25,
+      "capType": "hard",
+      "statutoryForfeitureMonthsAfterCycle": 6,
+      "excessiveThresholdDays": null,
+      "carryOverNotes": "Statutory leave must be taken within 6 months after the leave cycle or it is forfeited. Contractual leave capped at 25 days.",
+      "terminationNotes": "Mandatory payout of unused statutory leave. Annual leave cannot run concurrently with notice period."
+    },
+    "NG": {
+      "code": "NG",
+      "name": "Nigeria",
+      "entity": "Axon Global",
+      "statutoryDaysPerYear": 21,
+      "groupAccrualPerMonth": 1.75,
+      "accumulationCapDays": null,
+      "capType": "directive",
+      "carryOverMaxMonths": 12,
+      "excessiveThresholdDays": 30,
+      "carryOverNotes": "Carry-over permitted by mutual agreement up to 12 months following the year earned.",
+      "terminationNotes": "Mandatory payout of earned, unused statutory/contractual annual leave."
+    },
+    "CI": {
+      "code": "CI",
+      "name": "Ivory Coast",
+      "entity": "Axon Global",
+      "statutoryDaysPerYear": 26.4,
+      "accrualPerMonth": 2.2,
+      "tenureBonusEveryYears": 5,
+      "tenureBonusDays": 1,
+      "maxPostponementYears": 2,
+      "capType": "postponement",
+      "excessiveThresholdDays": null,
+      "carryOverNotes": "Postponement permitted for up to 2 consecutive years by agreement or operational necessity.",
+      "terminationNotes": "Mandatory payout for all unused accrued annual leave upon termination."
+    },
+    "ET": {
+      "code": "ET",
+      "name": "Ethiopia",
+      "entity": "Axon Global",
+      "baseDaysYear1": 16,
+      "tenureBonusEveryYears": 2,
+      "tenureBonusDays": 1,
+      "maxPostponementYears": 2,
+      "capType": "postponement",
+      "excessiveThresholdDays": 40,
+      "carryOverNotes": "Postponement permitted for up to 2 consecutive years maximum.",
+      "terminationNotes": "Mandatory payout of earned, unused statutory leave within valid limits."
+    },
+    "AU": {
+      "code": "AU",
+      "name": "Australia",
+      "entity": "Axon Global",
+      "statutoryDaysPerYear": 20,
+      "groupAccrualPerMonth": 1.6667,
+      "accumulationCapDays": null,
+      "capType": "none",
+      "excessiveThresholdDays": 40,
+      "carryOverNotes": "Annual leave never expires statutorily and carries over indefinitely.",
+      "terminationNotes": "Mandatory 100% payout of all unused accrued annual leave."
+    },
+    "AT": {
+      "code": "AT",
+      "name": "Austria",
+      "entity": "Axon Global",
+      "statutoryDaysPerYear": 25,
+      "accrualPerMonth": 2.0833,
+      "expiryYearsAfterLeaveYear": 2,
+      "capType": "expiry",
+      "excessiveThresholdDays": 40,
+      "carryOverNotes": "Leave carries forward and expires 2 years after the end of the leave year in which it accrued.",
+      "terminationNotes": "Mandatory payout (Ersatzleistung) of unused pro-rata leave upon termination."
+    }
+  },
+  "employeeCountryByName": {
+    "Chevonne Baxter": "ZA",
+    "Ephrem Brou": "CI",
+    "Gilberto Silva": "AU",
+    "Jason Kaplan": "ZA",
+    "Louis Nutt": "ZA",
+    "Markus Nel": "ZA",
+    "Olusegun Akintayo": "NG",
+    "Rapelang Marone": "ZA",
+    "Romeo Pestana": "AT",
+    "Tamirat Teshome": "ET",
+    "test case": "ZA",
+    "Thys Herbst": "ZA"
+  }
+}
