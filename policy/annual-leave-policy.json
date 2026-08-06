@@ -1,8 +1,9 @@
 {
   "version": 3,
-  "title": "Axon Group Annual Leave Policy",
+  "deployment": "leave-manager-white-label",
+  "title": "Company Annual Leave Policy",
   "effectiveFrom": "2026-01-01",
-  "sourceDocument": "Axon Group Annual Leave Policy V3.docx",
+  "sourceDocument": "Company Annual Leave Policy V3.docx",
   "lastUpdated": "2026-08-06",
   "principles": [
     "Lex Loci Laboris — local statutory minimums apply based on physical work location.",
@@ -10,14 +11,14 @@
     "South Africa enforces a 25-day contractual accumulation cap; other jurisdictions use excessive-leave directives instead of hard forfeiture where prohibited."
   ],
   "entities": {
-    "ZA": "Axon Technologies PTY Ltd (South Africa)",
-    "GLOBAL": "Axon Global Trading Limited (Mauritius)"
+    "ZA": "Company (South Africa)",
+    "GLOBAL": "Company (Global)"
   },
   "countries": {
     "ZA": {
       "code": "ZA",
       "name": "South Africa",
-      "entity": "Axon Technologies PTY",
+      "entity": "Company",
       "statutoryDaysPerYear": 15,
       "statutoryAccrualPerMonth": 1.25,
       "groupPolicyDaysPerYear": 20,
@@ -32,7 +33,7 @@
     "NG": {
       "code": "NG",
       "name": "Nigeria",
-      "entity": "Axon Global",
+      "entity": "Company",
       "statutoryDaysPerYear": 21,
       "groupAccrualPerMonth": 1.75,
       "accumulationCapDays": null,
@@ -45,7 +46,7 @@
     "CI": {
       "code": "CI",
       "name": "Ivory Coast",
-      "entity": "Axon Global",
+      "entity": "Company",
       "statutoryDaysPerYear": 26.4,
       "accrualPerMonth": 2.2,
       "tenureBonusEveryYears": 5,
@@ -59,7 +60,7 @@
     "ET": {
       "code": "ET",
       "name": "Ethiopia",
-      "entity": "Axon Global",
+      "entity": "Company",
       "baseDaysYear1": 16,
       "tenureBonusEveryYears": 2,
       "tenureBonusDays": 1,
@@ -72,7 +73,7 @@
     "AU": {
       "code": "AU",
       "name": "Australia",
-      "entity": "Axon Global",
+      "entity": "Company",
       "statutoryDaysPerYear": 20,
       "groupAccrualPerMonth": 1.6667,
       "accumulationCapDays": null,
@@ -84,7 +85,7 @@
     "AT": {
       "code": "AT",
       "name": "Austria",
-      "entity": "Axon Global",
+      "entity": "Company",
       "statutoryDaysPerYear": 25,
       "accrualPerMonth": 2.0833,
       "expiryYearsAfterLeaveYear": 2,
@@ -96,17 +97,6 @@
   },
   "employeeCountryByName": {
     "Antje Pestana": "ZA",
-    "Chevonne Baxter": "ZA",
-    "Ephrem Brou": "CI",
-    "Gilberto Silva": "AU",
-    "Jason Kaplan": "ZA",
-    "Louis Nutt": "ZA",
-    "Markus Nel": "ZA",
-    "Olusegun Akintayo": "NG",
-    "Rapelang Marone": "ZA",
-    "Romeo Pestana": "AT",
-    "Tamirat Teshome": "ET",
-    "test case": "ZA",
-    "Thys Herbst": "ZA"
+    "Romeo Pestana": "AT"
   }
 }

@@ -1,4 +1,5 @@
-// Axon Group annual leave policies — loads rules from policy/annual-leave-policy.json.
+// Local annual leave policies for this deployment only.
+// Edit policy/annual-leave-policy.json and the source document in policy/ for this system alone.
 
 const POLICY_URL = "/policy/annual-leave-policy.json";
 
