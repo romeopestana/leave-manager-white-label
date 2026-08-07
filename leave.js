@@ -1243,13 +1243,6 @@ function setupLeaveForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit leave request.");
-      logToServer({
-        action: "Leave Requested",
-        employeeName: emp?.name || "",
-        leaveType: type,
-        days,
-        leaveDate: dateStr,
-      });
       const requests = await loadLeaveRequests();
       renderLeaveRequests(requests);
       resetLeaveForm();
