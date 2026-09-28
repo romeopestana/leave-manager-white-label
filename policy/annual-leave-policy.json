@@ -1,15 +1,24 @@
 {
-  "version": 3,
+  "version": 4,
   "deployment": "leave-manager-white-label",
-  "title": "Company Annual Leave Policy",
+  "title": "Company Annual Leave Policy V4",
   "effectiveFrom": "2026-01-01",
-  "sourceDocument": "Company Annual Leave Policy V3.docx",
-  "lastUpdated": "2026-08-06",
+  "sourceDocument": "Company Annual Leave Policy V4.docx",
+  "lastUpdated": "2026-09-28",
   "principles": [
     "Lex Loci Laboris — local statutory minimums apply based on physical work location.",
     "Favor Laboris — any term less favourable than local statute is void; local law prevails.",
-    "South Africa enforces a 25-day contractual accumulation cap; other jurisdictions use excessive-leave directives instead of hard forfeiture where prohibited."
+    "South Africa enforces a 25-day contractual accumulation cap; other jurisdictions use excessive-leave directives instead of hard forfeiture where prohibited.",
+    "Sick leave is the statutory basic for a 5-day-week salaried employee with 4 or more years' service. Every sick cycle starts on 1 January 2026. Sick days before that date are ignored."
   ],
+  "sickLeaveAssumptions": {
+    "effectiveFrom": "2026-01-01",
+    "minimumYearsOfService": 4,
+    "workPattern": "5-day week, salaried",
+    "workingDaysPerWeek": 5,
+    "workingDaysPerMonth": 21.67,
+    "priorAbsenceIgnored": true
+  },
   "entities": {
     "ZA": "Company (South Africa)",
     "GLOBAL": "Company (Global)"
@@ -28,7 +37,17 @@
       "statutoryForfeitureMonthsAfterCycle": 6,
       "excessiveThresholdDays": null,
       "carryOverNotes": "Statutory leave must be taken within 6 months after the leave cycle or it is forfeited. Contractual leave capped at 25 days.",
-      "terminationNotes": "Mandatory payout of unused statutory leave. Annual leave cannot run concurrently with notice period."
+      "terminationNotes": "Mandatory payout of unused statutory leave. Annual leave cannot run concurrently with notice period.",
+      "sickLeave": {
+        "model": "fixed-cycle",
+        "cycleAnchor": "2026-01-01",
+        "cycleMonths": 36,
+        "entitlementDays": 30,
+        "fullPayDays": 30,
+        "halfPayDays": 0,
+        "unpaidDays": 0,
+        "summary": "30 paid working days in each 36-month cycle from 1 January 2026. The next cycle starts on 1 January 2029."
+      }
     },
     "NG": {
       "code": "NG",
@@ -41,7 +60,16 @@
       "carryOverMaxMonths": 12,
       "excessiveThresholdDays": 30,
       "carryOverNotes": "Carry-over permitted by mutual agreement up to 12 months following the year earned.",
-      "terminationNotes": "Mandatory payout of earned, unused statutory/contractual annual leave."
+      "terminationNotes": "Mandatory payout of earned, unused statutory/contractual annual leave.",
+      "sickLeave": {
+        "model": "calendar-year",
+        "cycleAnchor": "2026-01-01",
+        "entitlementDays": 12,
+        "fullPayDays": 12,
+        "halfPayDays": 0,
+        "unpaidDays": 0,
+        "summary": "12 paid working days each calendar year from 2026. Unused days are not carried over."
+      }
     },
     "CI": {
       "code": "CI",
@@ -55,7 +83,17 @@
       "capType": "postponement",
       "excessiveThresholdDays": null,
       "carryOverNotes": "Postponement permitted for up to 2 consecutive years by agreement or operational necessity.",
-      "terminationNotes": "Mandatory payout for all unused accrued annual leave upon termination."
+      "terminationNotes": "Mandatory payout for all unused accrued annual leave upon termination.",
+      "sickLeave": {
+        "model": "per-episode",
+        "cycleAnchor": "2026-01-01",
+        "paidDaysPerEpisode": 21.67,
+        "episodeGapDays": 3,
+        "fullPayDays": 21.67,
+        "halfPayDays": 0,
+        "unpaidDays": 0,
+        "summary": "21.67 paid working days per illness (1 month). A later booking within 3 calendar days continues the same illness. The job may be protected for longer, but this balance is the paid month only."
+      }
     },
     "ET": {
       "code": "ET",
@@ -68,7 +106,16 @@
       "capType": "postponement",
       "excessiveThresholdDays": 40,
       "carryOverNotes": "Postponement permitted for up to 2 consecutive years maximum.",
-      "terminationNotes": "Mandatory payout of earned, unused statutory leave within valid limits."
+      "terminationNotes": "Mandatory payout of earned, unused statutory leave within valid limits.",
+      "sickLeave": {
+        "model": "calendar-year",
+        "cycleAnchor": "2026-01-01",
+        "entitlementDays": 130,
+        "fullPayDays": 21.67,
+        "halfPayDays": 43.33,
+        "unpaidDays": 65,
+        "summary": "130 working days each calendar year from 2026: 21.67 at full pay, 43.33 at half pay, then 65 unpaid."
+      }
     },
     "AU": {
       "code": "AU",
@@ -80,7 +127,16 @@
       "capType": "none",
       "excessiveThresholdDays": 40,
       "carryOverNotes": "Annual leave never expires statutorily and carries over indefinitely.",
-      "terminationNotes": "Mandatory 100% payout of all unused accrued annual leave."
+      "terminationNotes": "Mandatory 100% payout of all unused accrued annual leave.",
+      "sickLeave": {
+        "model": "accruing",
+        "cycleAnchor": "2026-01-01",
+        "daysPerYear": 10,
+        "fullPayDays": 10,
+        "halfPayDays": 0,
+        "unpaidDays": 0,
+        "summary": "10 paid days credited on each 1 January from 2026. Unused days carry forward."
+      }
     },
     "AT": {
       "code": "AT",
@@ -92,7 +148,16 @@
       "capType": "expiry",
       "excessiveThresholdDays": 40,
       "carryOverNotes": "Leave carries forward and expires 2 years after the end of the leave year in which it accrued.",
-      "terminationNotes": "Mandatory payout (Ersatzleistung) of unused pro-rata leave upon termination."
+      "terminationNotes": "Mandatory payout (Ersatzleistung) of unused pro-rata leave upon termination.",
+      "sickLeave": {
+        "model": "calendar-year",
+        "cycleAnchor": "2026-01-01",
+        "entitlementDays": 60,
+        "fullPayDays": 40,
+        "halfPayDays": 20,
+        "unpaidDays": 0,
+        "summary": "60 working days each calendar year from 2026: 40 at full pay, then 20 at half pay (8 weeks + 4 weeks for 4 or more years' service)."
+      }
     }
   },
   "employeeCountryByName": {

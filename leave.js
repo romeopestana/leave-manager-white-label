@@ -5,6 +5,8 @@ import {
   getMaxAccumulationDays,
   getPolicyDocumentLinks,
   getPolicyForEmployee,
+  getSickBalance,
+  getSickOpeningDays,
   getStatutoryAccrualPerMonth,
   inferCountryFromName,
   initLeavePolicies,
@@ -496,6 +498,7 @@ function getAnnualBalanceForEmployee(emp, asOfDate = new Date()) {
 
 function getBalancesForEmployee(emp, asOfDate = new Date()) {
   const txs = Array.isArray(emp.transactions) ? emp.transactions : [];
+  const sickResult = getSickBalance(emp, asOfDate);
 
   let sickTaken = 0;
   let familyTaken = 0;
@@ -510,10 +513,11 @@ function getBalancesForEmployee(emp, asOfDate = new Date()) {
     const d = tx.dateISO ? new Date(tx.dateISO) : asOfDate;
     const year = d.getFullYear();
 
-    // Sick/Family/Study/Religious reset on 1 January (current-year deductions only).
+    // Family/Study/Religious reset on 1 January (current-year deductions only).
+    // Sick leave follows the employee's country cycle from 1 January 2026.
     switch (tx.type) {
       case "sick":
-        if (year === currentYear) sickTaken += days;
+        if (!sickResult && year === currentYear) sickTaken += days;
         break;
       case "family":
         if (year === currentYear) familyTaken += days;
@@ -538,12 +542,13 @@ function getBalancesForEmployee(emp, asOfDate = new Date()) {
   return {
     annual: clamp(policyResult.balance),
     annualRaw: clamp(annualRaw),
-    sick: clamp(emp.sickStart - sickTaken),
+    sick: clamp(sickResult ? sickResult.balance : emp.sickStart - sickTaken),
+    sickNote: sickResult?.note || "",
     family: clamp(emp.familyStart - familyTaken),
     study: clamp(emp.studyStart - studyTaken),
     religious: clamp(emp.religiousStart - religiousTaken),
     accrualRate,
-    policyWarnings: policyResult.warnings,
+    policyWarnings: [...policyResult.warnings, ...(sickResult?.warnings || [])],
     policyCapped: policyResult.capped,
   };
 }
@@ -598,6 +603,15 @@ async function saveManagedEmployeeUpdate(employeeId, fields) {
   if (!currentEmp) throw new Error("Employee not found.");
 
   const taken = getLeaveTakenForEmployee(currentEmp);
+  const sickPolicy = getSickBalance({ ...currentEmp, country, name });
+  if (sickPolicy && Math.abs(userSick - sickPolicy.balance) > 0.001) {
+    adjustments.push({
+      field: "sick",
+      requested: userSick,
+      applied: sickPolicy.balance,
+      message: `Sick leave stays at ${sickPolicy.balance.toFixed(2)} days under ${sickPolicy.countryName} policy. ${sickPolicy.note}`,
+    });
+  }
   const empForSolve = {
     ...currentEmp,
     country,
@@ -617,7 +631,8 @@ async function saveManagedEmployeeUpdate(employeeId, fields) {
     country,
     startDisplay,
     annualStart: resolvedAnnualStart,
-    sickStart: userSick + taken.sickTaken,
+    sickStart:
+      sickPolicy?.openingDays != null ? sickPolicy.openingDays : userSick + taken.sickTaken,
     familyStart: userFamily + taken.familyTaken,
     studyStart: userStudy + taken.studyTaken,
     religiousStart: userReligious + taken.religiousTaken,
@@ -742,6 +757,7 @@ function renderEmployeesTable(employees) {
     const sickTd = document.createElement("td");
     sickTd.className = "cell-small";
     sickTd.textContent = balances.sick.toFixed(2);
+    if (balances.sickNote) sickTd.title = balances.sickNote;
 
     const familyTd = document.createElement("td");
     familyTd.className = "cell-small";
@@ -893,6 +909,9 @@ function populateManageForm(emp) {
   document.getElementById("manage-emp-start").value = emp.startDisplay || "";
   document.getElementById("manage-emp-annual").value = fmt(balances.annual);
   document.getElementById("manage-emp-sick").value = fmt(balances.sick);
+  const sickInput = document.getElementById("manage-emp-sick");
+  sickInput.readOnly = Boolean(balances.sickNote);
+  sickInput.title = balances.sickNote || "";
   document.getElementById("manage-emp-family").value = fmt(balances.family);
   document.getElementById("manage-emp-study").value = fmt(balances.study);
   document.getElementById("manage-emp-religious").value = fmt(balances.religious);
@@ -993,7 +1012,7 @@ function setupEmployeeForm() {
     const startText = document.getElementById("emp-start").value.trim();
     const mmYY = parseMMYY(startText);
     const annualStart = parseDecimal(document.getElementById("emp-annual").value);
-    const sickStart = parseDecimal(document.getElementById("emp-sick").value);
+    let sickStart = parseDecimal(document.getElementById("emp-sick").value);
     const familyStart = parseDecimal(document.getElementById("emp-family").value);
     const studyStart = parseDecimal(document.getElementById("emp-study").value);
     const religiousStart = parseDecimal(document.getElementById("emp-religious").value);
@@ -1032,6 +1051,16 @@ function setupEmployeeForm() {
         "All leave values must be zero or positive.",
       );
       return;
+    }
+
+    const sickOpening = getSickOpeningDays({ country, name });
+    if (sickOpening != null) {
+      if (Math.abs(sickStart - sickOpening) > 0.001) {
+        alert(
+          `Sick leave opening balance set to ${sickOpening.toFixed(2)} days under this country's policy.`,
+        );
+      }
+      sickStart = sickOpening;
     }
 
     const employees = await loadEmployees();
@@ -1435,6 +1464,24 @@ function setupManageEmployee() {
     if (emp) populateManageForm(emp);
   });
 
+  const manageCountry = document.getElementById("manage-emp-country");
+  if (manageCountry) {
+    manageCountry.addEventListener("change", async () => {
+      const id = selectEl.value;
+      if (!id || !manageCountry.value) return;
+      const employees = await loadEmployees();
+      const emp = employees.find((e) => e.id === id);
+      if (!emp) return;
+      const preview = getSickBalance({ ...emp, country: manageCountry.value });
+      const sickInput = document.getElementById("manage-emp-sick");
+      if (sickInput && preview) {
+        sickInput.value = preview.balance.toFixed(2);
+        sickInput.title = preview.note;
+        sickInput.readOnly = true;
+      }
+    });
+  }
+
   const manageForm = document.getElementById("manage-employee-form");
   if (manageForm) {
     manageForm.addEventListener("submit", async (e) => {
@@ -1832,6 +1879,12 @@ function setupCountryFields() {
       new Date(),
     );
     empAccrual.value = rate.toFixed(2);
+    const sickOpening = getSickOpeningDays({ country, name: empName?.value?.trim() || "" });
+    const empSick = document.getElementById("emp-sick");
+    if (empSick && sickOpening != null) {
+      empSick.value = sickOpening.toFixed(2);
+      empSick.readOnly = true;
+    }
   }
 
   if (empCountry) {
@@ -1880,7 +1933,7 @@ async function ensurePolicyMigration() {
     await saveEmployees(migrated);
     logToServer({
       action: "Policy Migration",
-      employeeName: `${migrated.length} employees updated to country policy accrual rates`,
+      employeeName: `${migrated.length} employees updated to country leave policy`,
     });
     return migrated;
   }

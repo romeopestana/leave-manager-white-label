@@ -45,7 +45,16 @@ This white-label edition is designed to be rebranded and customized for each cli
   - Accrual is credited on the last day of each month.
   - Year-end unused annual carries over up to the employee’s configured max carry-over days.
   - Amounts above max carry-over are forfeited when the new year starts.
-- Sick/Family/Study/Religious:
+- Sick:
+  - Calculated from the employee’s country, for a 5-day week and 4 or more years’ service.
+  - The cycle starts on 1 January 2026. Sick days before that date do not reduce the balance.
+  - South Africa: 30 paid days per 36-month cycle.
+  - Nigeria: 12 paid days each calendar year, no carry-over.
+  - Ivory Coast: 21.67 paid days per illness.
+  - Ethiopia: 130 days each calendar year (21.67 full pay, 43.33 half pay, 65 unpaid).
+  - Australia: 10 paid days credited each 1 January from 2026; unused days carry forward.
+  - Austria: 60 days each calendar year (40 full pay, then 20 half pay).
+- Family/Study/Religious:
   - Reset on 1 January every year.
   - Only current-year transactions reduce the balance.
 

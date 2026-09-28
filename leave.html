@@ -492,8 +492,8 @@
             </div>
           </div>
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
-            <span class="pill" id="policy-version-label">Policy v3</span>
-            <a class="btn btn-ghost" id="policy-doc-link" href="/policy/Company%20Annual%20Leave%20Policy%20V3.docx" target="_blank" rel="noopener">Policy document</a>
+            <span class="pill" id="policy-version-label">Policy v4</span>
+            <a class="btn btn-ghost" id="policy-doc-link" href="/policy/Company%20Annual%20Leave%20Policy%20V4.docx" target="_blank" rel="noopener">Policy document</a>
             <a class="btn btn-ghost" id="policy-json-link" href="/policy/annual-leave-policy.json" target="_blank" rel="noopener">Policy rules</a>
             <button type="button" class="btn btn-ghost" id="export-data-btn">Export backup</button>
             <button type="button" class="btn btn-ghost" id="import-data-btn">Import backup</button>
@@ -509,7 +509,7 @@
                 <div class="card-title">Create Employee</div>
                 <div class="card-subtitle">
                   Start balances are effective from 1&nbsp;Jan&nbsp;2026. Accrual
-                  rates follow each employee&apos;s work location (Policy V3).
+                  rates follow each employee&apos;s work location (Policy V4).
                 </div>
               </div>
               <span class="highlight-chip">
@@ -567,10 +567,12 @@
                     min="0"
                     step="0.01"
                     id="emp-sick"
-                    placeholder="e.g. 10.50"
+                    placeholder="Set from country"
                     inputmode="decimal"
+                    title="Calculated from the employee’s country sick-leave policy."
                     required
                   />
+                  <p class="muted" style="margin: 4px 0 0; font-size: 12px;">Set from the country sick-leave policy.</p>
                 </div>
                 <div class="field">
                   <label class="field-label">Family resp. (days) <span>*</span></label>
@@ -914,7 +916,8 @@
                 </div>
                 <div class="field">
                   <label class="field-label">Sick leave (days) <span>*</span></label>
-                  <input class="input" type="text" id="manage-emp-sick" placeholder="10.50" inputmode="decimal" required />
+                  <input class="input" type="text" id="manage-emp-sick" placeholder="Set from country" inputmode="decimal" title="Calculated from the employee’s country sick-leave policy and sick days taken since 1 January 2026." required />
+                  <p class="muted" style="margin: 4px 0 0; font-size: 12px;">Country policy, minus sick days taken in the current cycle.</p>
                 </div>
                 <div class="field">
                   <label class="field-label">Family resp. (days) <span>*</span></label>
