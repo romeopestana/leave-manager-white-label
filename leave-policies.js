@@ -52,6 +52,10 @@ export function round2(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+export function round4(value) {
+  return Math.round((value + Number.EPSILON) * 10000) / 10000;
+}
+
 export function inferCountryFromName(name) {
   if (!name) return null;
   const trimmed = name.trim();
@@ -142,7 +146,8 @@ export function getStatutoryAccrualPerMonth(emp, asOfDate = new Date()) {
 export function resolveAnnualAccrualPerMonth(emp, asOfDate = new Date()) {
   const statutory = getStatutoryAccrualPerMonth(emp, asOfDate);
   const configured = Number(emp.annualAccrualPerMonth) || 0;
-  return round2(Math.max(statutory, configured));
+  // Keep 4 decimal places so 25 days/year (2.0833) is not rounded below statute.
+  return round4(Math.max(statutory, configured));
 }
 
 export function getPolicyForEmployee(emp) {
@@ -197,12 +202,12 @@ export function clampManagedLeaveToPolicy(emp, values = {}, asOfDate = new Date(
     { ...emp, country: emp.country || inferCountryFromName(emp.name) },
     asOfDate,
   );
-  if (accrual != null && accrual + 0.001 < statutoryAccrual) {
+  if (accrual != null && accrual + 0.0001 < statutoryAccrual) {
     adjustments.push({
       field: "accrual",
       requested: accrual,
       applied: statutoryAccrual,
-      message: `Accrual raised to ${statutoryAccrual.toFixed(2)}/mo (${policy?.name || "policy"} minimum).`,
+      message: `Accrual raised to ${round4(statutoryAccrual)}/mo (${policy?.name || "policy"} minimum).`,
     });
     accrual = statutoryAccrual;
   }
@@ -535,7 +540,7 @@ export function migrateEmployeeToPolicy(emp, asOfDate = new Date()) {
     { ...emp, country },
     asOfDate,
   );
-  const compliantAccrual = round2(
+  const compliantAccrual = round4(
     Math.max(statutoryAccrual, Number(emp.annualAccrualPerMonth) || 0),
   );
   const sickOpening = getSickOpeningDays({ ...emp, country });
@@ -544,7 +549,7 @@ export function migrateEmployeeToPolicy(emp, asOfDate = new Date()) {
 
   const changed =
     emp.country !== country ||
-    round2(emp.annualAccrualPerMonth || 0) !== compliantAccrual ||
+    round4(emp.annualAccrualPerMonth || 0) !== compliantAccrual ||
     (sickOpening != null && round2(Number(emp.sickStart) || 0) !== compliantSick);
 
   if (!changed) {

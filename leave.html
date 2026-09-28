@@ -17,6 +17,7 @@
         --accent-hover: #004d8c;
         --accent-soft: rgba(0, 102, 179, 0.1);
         --danger: #c53030;
+        --warning: #b7791f;
         --border-subtle: #e2e8f0;
         --radius-lg: 12px;
         --radius-md: 8px;
@@ -464,20 +465,274 @@
         justify-content: flex-end;
         gap: 8px;
       }
+
+      .brand-header {
+        margin-bottom: 0;
+      }
+
+      .brand-lockup {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .app-version {
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--muted);
+        border: 1px solid var(--border-subtle);
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+
+      .app-layout {
+        display: flex;
+        align-items: stretch;
+        min-height: calc(100vh - 73px);
+      }
+
+      .page-shell {
+        flex: 1;
+        min-width: 0;
+        min-height: calc(100vh - 73px);
+      }
+
+      .app-sidebar {
+        width: 228px;
+        flex-shrink: 0;
+        padding: 18px 12px 28px;
+        border-right: 1px solid var(--border-subtle);
+        background: var(--bg-card);
+      }
+
+      .app-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--text-muted);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 650;
+        padding: 10px 12px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+      }
+
+      .nav-item:hover {
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      .nav-item.is-active {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: var(--border-subtle);
+      }
+
+      .nav-item.has-alert {
+        color: var(--warning);
+        border-color: rgba(183, 121, 31, 0.35);
+        background: rgba(183, 121, 31, 0.08);
+      }
+
+      .nav-badge {
+        margin-left: auto;
+        min-width: 18px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: var(--warning);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .app-panel {
+        display: none;
+      }
+
+      .app-panel.is-active {
+        display: block;
+      }
+
+      .role-hidden {
+        display: none !important;
+      }
+
+      .dashboard-stats {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+        margin: 4px 0 16px;
+      }
+
+      .dashboard-stat {
+        background: var(--accent-soft);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 12px 12px 10px;
+        min-width: 0;
+      }
+
+      .dashboard-stat-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .dashboard-stat-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text);
+        margin-top: 4px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .dashboard-stat-value.alert {
+        color: var(--warning);
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .dashboard-grid-lists {
+        grid-template-columns: 1fr 1fr;
+        margin-bottom: 0;
+      }
+
+      .dashboard-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text);
+        margin-bottom: 8px;
+      }
+
+      .dashboard-type-mix {
+        margin-top: 8px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .dashboard-alerts,
+      .dashboard-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 260px;
+        overflow: auto;
+      }
+
+      .dashboard-alerts li,
+      .dashboard-list li {
+        font-size: 12px;
+        line-height: 1.4;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-subtle);
+        background: var(--bg);
+      }
+
+      .dashboard-alerts li.alert-critical {
+        border-color: rgba(197, 48, 48, 0.35);
+        background: rgba(197, 48, 48, 0.08);
+        color: var(--danger);
+      }
+
+      .dashboard-alerts li.alert-warning {
+        border-color: rgba(183, 121, 31, 0.35);
+        background: rgba(183, 121, 31, 0.08);
+        color: #744210;
+      }
+
+      @media (max-width: 1100px) {
+        .dashboard-stats {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .dashboard-grid,
+        .dashboard-grid-lists {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .app-layout {
+          flex-direction: column;
+        }
+        .app-sidebar {
+          width: 100%;
+          border-right: none;
+          border-bottom: 1px solid var(--border-subtle);
+          padding: 12px;
+        }
+        .app-nav {
+          flex-direction: row;
+          flex-wrap: wrap;
+        }
+        .nav-item {
+          width: auto;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .dashboard-stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
     </style>
   </head>
   <body>
     <header class="brand-header" id="brand-header">
-      <a id="brand-link" href="#" target="_blank" rel="noopener" style="display: none;">
-        <img id="brand-logo" src="" alt="" class="brand-logo" />
-      </a>
-      <div id="brand-text" class="brand-text">Leave Manager</div>
+      <div class="brand-lockup">
+        <a id="brand-link" href="#" target="_blank" rel="noopener" style="display: none;">
+          <img id="brand-logo" src="" alt="" class="brand-logo" />
+        </a>
+        <div id="brand-text" class="brand-text">Leave Manager</div>
+        <span id="app-version" class="app-version" hidden></span>
+      </div>
       <div id="session-bar" style="margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 0.9rem;">
         <span id="session-user-label" class="muted"></span>
         <button type="button" class="btn btn-ghost" id="change-password-btn">Change password</button>
         <button type="button" class="btn btn-ghost" id="logout-btn">Sign out</button>
       </div>
     </header>
+    <div class="app-layout">
+      <aside class="app-sidebar" id="app-sidebar">
+        <nav class="app-nav" id="app-nav" aria-label="Main">
+          <button type="button" class="nav-item is-active" data-nav="dashboard-panel">Dashboard</button>
+          <button type="button" class="nav-item" data-nav="leave-request-panel">Request Leave</button>
+          <button type="button" class="nav-item" data-nav="employees-balances-panel">Employees &amp; Balances</button>
+          <button type="button" class="nav-item" data-nav="manage-employees-panel">Manage Employees</button>
+          <button type="button" class="nav-item" data-nav="reporting-panel">Reporting</button>
+          <button type="button" class="nav-item" data-nav="leave-approvals-panel" id="nav-leave-approvals">
+            <span>Leave Approvals</span>
+            <span class="nav-badge" id="nav-approvals-badge" hidden>0</span>
+          </button>
+          <button type="button" class="nav-item" data-nav="admin-employee-create-panel">Create Employee</button>
+          <button type="button" class="nav-item" data-nav="users-panel">User Profiles</button>
+        </nav>
+      </aside>
     <div class="page-shell">
       <main class="page-inner page-content">
         <header class="page-header">
@@ -502,8 +757,66 @@
         </header>
 
         <section class="layout-grid">
-          <!-- Top: Create Employee + Request Leave -->
-          <section class="card card-panel" id="admin-employee-create-panel">
+          <section class="card card-panel app-panel is-active" id="dashboard-panel">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Dashboard</div>
+                <div class="card-subtitle">
+                  Snapshot of leave activity, top usage, and policy alerts.
+                </div>
+              </div>
+              <div class="badge">
+                Today: <strong id="dashboard-date-label"></strong>
+              </div>
+            </div>
+            <div class="dashboard-stats" id="dashboard-stats"></div>
+            <div class="dashboard-grid">
+              <div>
+                <div class="dashboard-section-title">Most leave taken (this year)</div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Employee</th>
+                        <th>Annual</th>
+                        <th>Sick</th>
+                        <th>Other</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dashboard-top-tbody">
+                      <tr>
+                        <td colspan="5" class="muted">No leave recorded this year.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="dashboard-type-mix" id="dashboard-type-mix"></div>
+              </div>
+              <div>
+                <div class="dashboard-section-title">Alerts</div>
+                <ul class="dashboard-alerts" id="dashboard-alerts">
+                  <li class="muted">No alerts.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="dashboard-grid dashboard-grid-lists">
+              <div>
+                <div class="dashboard-section-title">On leave today</div>
+                <ul class="dashboard-list" id="dashboard-on-leave">
+                  <li class="muted">Nobody is on leave today.</li>
+                </ul>
+              </div>
+              <div>
+                <div class="dashboard-section-title">Upcoming (14 days)</div>
+                <ul class="dashboard-list" id="dashboard-upcoming">
+                  <li class="muted">No upcoming leave in the next 14 days.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section class="card card-panel app-panel" id="admin-employee-create-panel">
             <div class="card-header">
               <div>
                 <div class="card-title">Create Employee</div>
@@ -619,7 +932,7 @@
                     class="input"
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="0.0001"
                     id="emp-accrual"
                     placeholder="e.g. 1.25"
                     inputmode="decimal"
@@ -654,7 +967,7 @@
             </form>
           </section>
 
-          <section class="card card-panel" id="leave-request-panel">
+          <section class="card card-panel app-panel" id="leave-request-panel">
             <div class="card-header" style="margin-bottom: 8px;">
               <div>
                 <div class="card-title">Request Leave</div>
@@ -711,7 +1024,7 @@
             </form>
           </section>
 
-          <section class="card card-panel" id="leave-approvals-panel">
+          <section class="card card-panel app-panel" id="leave-approvals-panel">
             <div class="card-header">
               <div>
                 <div class="card-title">Leave Approvals</div>
@@ -740,7 +1053,7 @@
             </div>
           </section>
 
-          <section class="card card-panel" id="users-panel">
+          <section class="card card-panel app-panel" id="users-panel">
             <div class="card-header">
               <div>
                 <div class="card-title">User Profiles</div>
@@ -801,7 +1114,7 @@
           </section>
 
           <!-- Bottom: Employees & Leave Balances -->
-          <section class="card card-panel">
+          <section class="card card-panel app-panel" id="employees-balances-panel">
             <div class="card-header">
               <div>
                 <div class="card-title">Employees &amp; Leave Balances</div>
@@ -834,16 +1147,16 @@
                 <tbody id="employees-tbody">
                   <tr>
                     <td colspan="10" class="muted">
-                      No employees yet. Create one above.
+                      No employees yet. Create one in Create Employee.
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <div id="reporting-section">
-            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
+          </section>
 
+          <section class="card card-panel app-panel" id="reporting-panel">
             <div class="card-header" style="margin-bottom: 8px;">
               <div>
                 <div class="card-title">Reporting</div>
@@ -853,7 +1166,7 @@
               </div>
             </div>
 
-            <div id="reporting-panel" class="form-grid form-grid-compact" style="margin-bottom: 12px; max-width: 560px;">
+            <div id="reporting-filters" class="form-grid form-grid-compact" style="margin-bottom: 12px; max-width: 560px;">
               <div class="field">
                 <label class="field-label">Employee <span>*</span></label>
                 <select id="report-employee-select" class="select">
@@ -873,11 +1186,9 @@
               </div>
             </div>
             <div id="report-error" class="error-text" style="display: none;"></div>
-            </div>
+          </section>
 
-            <div id="manage-employees-section">
-            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 14px 0;" />
-
+          <section class="card card-panel app-panel" id="manage-employees-panel">
             <div class="card-header" style="margin-bottom: 8px;" id="manage-employees-header">
               <div>
                 <div class="card-title">Manage Employees</div>
@@ -887,7 +1198,7 @@
               </div>
             </div>
 
-            <div class="field" style="max-width: 280px; margin-bottom: 12px;" id="manage-employees-panel">
+            <div class="field" style="max-width: 280px; margin-bottom: 12px;" id="manage-employee-select-wrap">
               <label class="field-label">Select employee</label>
               <select id="manage-employee-select" class="select">
                 <option value="">Select employee to manage</option>
@@ -947,10 +1258,10 @@
               </div>
               <div id="manage-form-error" class="error-text" style="display: none;"></div>
             </form>
-            </div>
           </section>
         </section>
       </main>
+    </div>
     </div>
 
     <div id="report-modal-overlay" class="report-modal-overlay">

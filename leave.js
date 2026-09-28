@@ -13,6 +13,7 @@ import {
   migrateEmployeesToPolicies,
   resolveAnnualAccrualPerMonth,
   round2,
+  round4,
 } from "./leave-policies.js";
 
 let currentUser = null;
@@ -35,26 +36,23 @@ function applyRoleVisibility(user) {
   const isEmployee = role === "employee";
   const canManageEmployees = isAdmin || isExco;
 
-  const setShown = (id, shown) => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = shown ? "" : "none";
+  const setRoleShown = (id, shown) => {
+    document.getElementById(id)?.classList.toggle("role-hidden", !shown);
+    document.querySelector(`.nav-item[data-nav="${id}"]`)?.classList.toggle("role-hidden", !shown);
   };
 
-  setShown("admin-employee-create-panel", isAdmin);
-  setShown("users-panel", isAdmin);
-  setShown("manage-employees-section", canManageEmployees);
-  setShown("manage-employees-header", canManageEmployees);
-  setShown("manage-employees-panel", canManageEmployees);
+  setRoleShown("admin-employee-create-panel", isAdmin);
+  setRoleShown("users-panel", isAdmin);
+  setRoleShown("manage-employees-panel", canManageEmployees);
   const manageForm = document.getElementById("manage-employee-form");
   if (manageForm && !canManageEmployees) manageForm.style.display = "none";
 
   const deleteBtn = document.getElementById("manage-delete-btn");
   if (deleteBtn) deleteBtn.style.display = isAdmin ? "" : "none";
 
-  setShown("leave-request-panel", isAdmin || isEmployee || isExco);
-  setShown("leave-approvals-panel", isExco || isAdmin || isEmployee);
-  setShown("reporting-section", isAdmin || isExco);
-  setShown("reporting-panel", isAdmin || isExco);
+  setRoleShown("leave-request-panel", isAdmin || isEmployee || isExco);
+  setRoleShown("leave-approvals-panel", isExco || isAdmin || isEmployee);
+  setRoleShown("reporting-panel", isAdmin || isExco);
 
   const exportBtn = document.getElementById("export-data-btn");
   const importBtn = document.getElementById("import-data-btn");
@@ -67,6 +65,52 @@ function applyRoleVisibility(user) {
   }
 }
 
+function refreshPanelSelects(panelId) {
+  if (panelId === "leave-request-panel") {
+    renderEmployeeSelect(lastEmployees);
+  } else if (panelId === "manage-employees-panel") {
+    renderManageEmployeeSelect(lastEmployees);
+  } else if (panelId === "reporting-panel") {
+    renderReportEmployeeSelect(lastEmployees);
+  } else if (panelId === "users-panel") {
+    renderUserEmployeeLink(lastEmployees);
+  }
+}
+
+function showAppSection(panelId) {
+  const target = panelId || "dashboard-panel";
+  document.querySelectorAll(".app-panel").forEach((panel) => {
+    panel.classList.toggle("is-active", panel.id === target);
+  });
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.getAttribute("data-nav") === target);
+  });
+  refreshPanelSelects(target);
+}
+
+function setupAppNav() {
+  const nav = document.getElementById("app-nav");
+  if (!nav) return;
+  nav.addEventListener("click", (e) => {
+    const btn = e.target.closest(".nav-item");
+    if (!btn || btn.classList.contains("role-hidden")) return;
+    const target = btn.getAttribute("data-nav");
+    if (target) showAppSection(target);
+  });
+  showAppSection("dashboard-panel");
+}
+
+function updateApprovalsNavBadge(requests = lastRequests) {
+  const pending = (requests || []).filter((r) => r.status === "pending").length;
+  const btn = document.getElementById("nav-leave-approvals");
+  const badge = document.getElementById("nav-approvals-badge");
+  if (btn) btn.classList.toggle("has-alert", pending > 0);
+  if (badge) {
+    badge.hidden = pending === 0;
+    badge.textContent = String(pending);
+  }
+}
+
 async function loadLeaveRequests() {
   const res = await fetch("/api/leave-requests", { cache: "no-store" });
   if (!res.ok) return [];
@@ -74,13 +118,18 @@ async function loadLeaveRequests() {
 }
 
 function renderLeaveRequests(requests) {
+  lastRequests = Array.isArray(requests) ? requests : [];
   const tbody = document.getElementById("leave-requests-tbody");
-  if (!tbody) return;
+  if (!tbody) {
+    renderDashboard(lastEmployees, lastRequests);
+    return;
+  }
   tbody.innerHTML = "";
   if (!requests.length) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td colspan="7" class="muted">No leave requests yet.</td>`;
     tbody.appendChild(tr);
+    renderDashboard(lastEmployees, lastRequests);
     return;
   }
 
@@ -104,6 +153,7 @@ function renderLeaveRequests(requests) {
     `;
     tbody.appendChild(tr);
   }
+  renderDashboard(lastEmployees, lastRequests);
 }
 
 async function loadUsers() {
@@ -163,6 +213,9 @@ function renderUserEmployeeLink(employees) {
 // Baseline: all starting balances are effective from 1 Jan 2026.
 // Branding is loaded from config/brand.json for white-label customization.
 
+let lastEmployees = [];
+let lastRequests = [];
+
 const STORAGE_KEY = "leave-manager-employees-v1";
 const BASELINE_YEAR = 2026;
 const BRAND_CONFIG_PATH = "/config/brand.json";
@@ -212,6 +265,17 @@ function applyBrand(brand) {
   const logoPath = (brand.logoPath || "").trim();
   const websiteUrl = (brand.websiteUrl || "").trim();
   const label = brand.productName || DEFAULT_BRAND.productName;
+
+  const versionEl = document.getElementById("app-version");
+  if (versionEl) {
+    const version = String(brand.appVersion || "").trim();
+    if (version) {
+      versionEl.textContent = version.startsWith("v") ? version : `v${version}`;
+      versionEl.hidden = false;
+    } else {
+      versionEl.hidden = true;
+    }
+  }
 
   if (logoPath && brandLink && brandLogo) {
     brandLogo.src = logoPath;
@@ -706,9 +770,296 @@ function countryLabel(code) {
   return policy ? policy.name : code || "—";
 }
 
+function toIsoDateLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseIsoDateLocal(iso) {
+  if (!iso) return null;
+  const s = String(iso).slice(0, 10);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function yearLeaveTaken(emp, year) {
+  const txs = Array.isArray(emp.transactions) ? emp.transactions : [];
+  const taken = { annual: 0, sick: 0, family: 0, study: 0, religious: 0, total: 0 };
+  for (const tx of txs) {
+    const type = tx.type;
+    if (!Object.prototype.hasOwnProperty.call(taken, type) || type === "total") continue;
+    const days = Number(tx.days) || 0;
+    if (!days) continue;
+    const d = parseIsoDateLocal(tx.dateISO);
+    if (!d || d.getFullYear() !== year) continue;
+    taken[type] += days;
+    taken.total += days;
+  }
+  return taken;
+}
+
+function monthLeaveTaken(emp, asOfDate) {
+  const txs = Array.isArray(emp.transactions) ? emp.transactions : [];
+  const year = asOfDate.getFullYear();
+  const month = asOfDate.getMonth();
+  let total = 0;
+  for (const tx of txs) {
+    const days = Number(tx.days) || 0;
+    if (!days || !tx.dateISO) continue;
+    const d = parseIsoDateLocal(tx.dateISO);
+    if (!d) continue;
+    if (d.getFullYear() === year && d.getMonth() === month) total += days;
+  }
+  return total;
+}
+
+function collectLeaveSpans(employees, requests) {
+  const items = [];
+  for (const emp of employees || []) {
+    for (const tx of emp.transactions || []) {
+      const span = workingDaySpanLocal(tx.dateISO, tx.days);
+      if (!span) continue;
+      items.push({
+        name: emp.name || "",
+        type: tx.type,
+        days: Number(tx.days) || 0,
+        start: span.start,
+        end: span.end,
+        status: "approved",
+      });
+    }
+  }
+  for (const req of requests || []) {
+    if (!req || req.status !== "pending") continue;
+    const span = workingDaySpanLocal(req.dateISO, req.days);
+    if (!span) continue;
+    items.push({
+      name: req.employeeName || "",
+      type: req.type,
+      days: Number(req.days) || 0,
+      start: span.start,
+      end: span.end,
+      status: "pending",
+    });
+  }
+  return items;
+}
+
+function spanContainsDay(span, day) {
+  if (!span) return false;
+  const k = dateKey(day);
+  return dateKey(span.start) <= k && k <= dateKey(span.end);
+}
+
+function formatSpanLabel(item) {
+  const start = formatDisplayDate(toIsoDateLocal(item.start));
+  const end = formatDisplayDate(toIsoDateLocal(item.end));
+  const range = start === end ? start : `${start} – ${end}`;
+  const pending = item.status === "pending" ? " (pending)" : "";
+  return `${item.name} — ${leaveTypeLabel(item.type)} ${Number(item.days).toFixed(2)}d (${range})${pending}`;
+}
+
+function setListContent(el, items, emptyText) {
+  if (!el) return;
+  el.innerHTML = "";
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.className = "muted";
+    li.textContent = emptyText;
+    el.appendChild(li);
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement("li");
+    if (item.className) li.className = item.className;
+    li.textContent = item.text;
+    el.appendChild(li);
+  }
+}
+
+function renderDashboard(employees = lastEmployees, requests = lastRequests) {
+  lastEmployees = Array.isArray(employees) ? employees : [];
+  lastRequests = Array.isArray(requests) ? requests : [];
+  updateApprovalsNavBadge(lastRequests);
+
+  const statsEl = document.getElementById("dashboard-stats");
+  if (!statsEl) return;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const year = today.getFullYear();
+  const horizon = new Date(today);
+  horizon.setDate(horizon.getDate() + 14);
+
+  const pending = lastRequests.filter((r) => r.status === "pending");
+  const spans = collectLeaveSpans(lastEmployees, lastRequests);
+  const onLeave = spans.filter((s) => s.status === "approved" && spanContainsDay(s, today));
+  const upcoming = spans
+    .filter((s) => dateKey(s.start) > dateKey(today) && dateKey(s.start) <= dateKey(horizon))
+    .sort((a, b) => dateKey(a.start) - dateKey(b.start));
+
+  let ytdTotal = 0;
+  let monthTotal = 0;
+  const mix = { annual: 0, sick: 0, family: 0, study: 0, religious: 0 };
+  const rankings = [];
+
+  for (const emp of lastEmployees) {
+    const taken = yearLeaveTaken(emp, year);
+    ytdTotal += taken.total;
+    monthTotal += monthLeaveTaken(emp, today);
+    mix.annual += taken.annual;
+    mix.sick += taken.sick;
+    mix.family += taken.family;
+    mix.study += taken.study;
+    mix.religious += taken.religious;
+    rankings.push({ emp, taken });
+  }
+  rankings.sort((a, b) => b.taken.total - a.taken.total);
+
+  const statTiles = [
+    { label: "Employees", value: String(lastEmployees.length) },
+    { label: "Pending approvals", value: String(pending.length), alert: pending.length > 0 },
+    { label: "On leave today", value: String(onLeave.length) },
+    { label: "Upcoming (14d)", value: String(upcoming.length) },
+    { label: "Days taken YTD", value: ytdTotal.toFixed(1) },
+    { label: "Days taken this month", value: monthTotal.toFixed(1) },
+  ];
+  statsEl.innerHTML = "";
+  for (const tile of statTiles) {
+    const div = document.createElement("div");
+    div.className = "dashboard-stat";
+    const label = document.createElement("div");
+    label.className = "dashboard-stat-label";
+    label.textContent = tile.label;
+    const value = document.createElement("div");
+    value.className = "dashboard-stat-value" + (tile.alert ? " alert" : "");
+    value.textContent = tile.value;
+    div.appendChild(label);
+    div.appendChild(value);
+    statsEl.appendChild(div);
+  }
+
+  const topBody = document.getElementById("dashboard-top-tbody");
+  if (topBody) {
+    topBody.innerHTML = "";
+    const top = rankings.filter((r) => r.taken.total > 0).slice(0, 8);
+    if (!top.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td colspan="5" class="muted">No leave recorded this year.</td>`;
+      topBody.appendChild(tr);
+    } else {
+      for (const row of top) {
+        const tr = document.createElement("tr");
+        const other = row.taken.family + row.taken.study + row.taken.religious;
+        tr.innerHTML = `
+          <td>${escapeHtml(row.emp.name || "")}</td>
+          <td class="cell-small">${row.taken.annual.toFixed(2)}</td>
+          <td class="cell-small">${row.taken.sick.toFixed(2)}</td>
+          <td class="cell-small">${other.toFixed(2)}</td>
+          <td class="cell-small"><strong>${row.taken.total.toFixed(2)}</strong></td>
+        `;
+        topBody.appendChild(tr);
+      }
+    }
+  }
+
+  const mixEl = document.getElementById("dashboard-type-mix");
+  if (mixEl) {
+    mixEl.textContent = ytdTotal
+      ? `YTD mix: Annual ${mix.annual.toFixed(1)} · Sick ${mix.sick.toFixed(1)} · Family ${mix.family.toFixed(1)} · Study ${mix.study.toFixed(1)} · Religious ${mix.religious.toFixed(1)}`
+      : "";
+  }
+
+  const alerts = [];
+  if (pending.length) {
+    const names = [...new Set(pending.map((r) => r.employeeName || "Employee"))].slice(0, 4);
+    const extra = pending.length > names.length ? ` +${pending.length - names.length} more` : "";
+    alerts.push({
+      className: "alert-warning",
+      text: `${pending.length} leave request${pending.length === 1 ? "" : "s"} awaiting approval (${names.join(", ")}${extra}).`,
+    });
+  }
+  if (onLeave.length) {
+    alerts.push({
+      className: "alert-info",
+      text: `${onLeave.length} employee${onLeave.length === 1 ? " is" : "s are"} on leave today.`,
+    });
+  }
+
+  for (const emp of lastEmployees) {
+    const balances = getBalancesForEmployee(emp, now);
+    for (const warn of balances.policyWarnings || []) {
+      alerts.push({
+        className: warn.level === "critical" ? "alert-critical" : "alert-warning",
+        text: `${emp.name}: ${warn.message}`,
+      });
+    }
+    const cap = getMaxAccumulationDays(emp, now);
+    const policy = getPolicyForEmployee(emp);
+    if (policy?.capType === "hard" && cap != null && balances.annual >= cap - 2 && balances.annual < cap) {
+      alerts.push({
+        className: "alert-warning",
+        text: `${emp.name}: annual balance ${balances.annual.toFixed(2)} is near the ${cap}-day cap.`,
+      });
+    }
+    if (balances.annual < 2) {
+      alerts.push({
+        className: "alert-warning",
+        text: `${emp.name}: annual leave is low (${balances.annual.toFixed(2)} days).`,
+      });
+    }
+    if ((Number(emp.sickStart) || 0) > 0 && balances.sick <= 0) {
+      alerts.push({
+        className: "alert-warning",
+        text: `${emp.name}: sick leave balance is 0.`,
+      });
+    }
+  }
+
+  const seen = new Set();
+  const uniqueAlerts = [];
+  for (const alert of alerts) {
+    if (seen.has(alert.text)) continue;
+    seen.add(alert.text);
+    uniqueAlerts.push(alert);
+  }
+  setListContent(
+    document.getElementById("dashboard-alerts"),
+    uniqueAlerts.slice(0, 12),
+    "No alerts.",
+  );
+  setListContent(
+    document.getElementById("dashboard-on-leave"),
+    onLeave.map((item) => ({ text: formatSpanLabel(item) })),
+    "Nobody is on leave today.",
+  );
+  setListContent(
+    document.getElementById("dashboard-upcoming"),
+    upcoming.slice(0, 8).map((item) => ({ text: formatSpanLabel(item) })),
+    "No upcoming leave in the next 14 days.",
+  );
+
+  const dashDate = document.getElementById("dashboard-date-label");
+  if (dashDate) {
+    dashDate.textContent = now.toLocaleDateString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+}
+
 function renderEmployeesTable(employees) {
+  lastEmployees = Array.isArray(employees) ? employees : [];
   const tbody = document.getElementById("employees-tbody");
-  if (!tbody) return;
+  if (!tbody) {
+    renderDashboard(lastEmployees, lastRequests);
+    return;
+  }
   tbody.innerHTML = "";
 
   if (!employees.length) {
@@ -716,9 +1067,10 @@ function renderEmployeesTable(employees) {
     const td = document.createElement("td");
     td.colSpan = 10;
     td.className = "muted";
-    td.textContent = "No employees yet. Create one above.";
+    td.textContent = "No employees yet. Create one in Create Employee.";
     tr.appendChild(td);
     tbody.appendChild(tr);
+    renderDashboard(lastEmployees, lastRequests);
     return;
   }
 
@@ -773,7 +1125,7 @@ function renderEmployeesTable(employees) {
 
     const accrualTd = document.createElement("td");
     accrualTd.className = "cell-small muted";
-    accrualTd.textContent = balances.accrualRate.toFixed(2);
+    accrualTd.textContent = Number(balances.accrualRate).toFixed(4);
     if (balances.policyCapped) {
       accrualTd.title = `Uncapped balance: ${balances.annualRaw.toFixed(2)} days`;
     }
@@ -796,6 +1148,7 @@ function renderEmployeesTable(employees) {
 
     tbody.appendChild(tr);
   }
+  renderDashboard(lastEmployees, lastRequests);
 }
 
 function renderEmployeeSelect(employees) {
@@ -915,7 +1268,7 @@ function populateManageForm(emp) {
   document.getElementById("manage-emp-family").value = fmt(balances.family);
   document.getElementById("manage-emp-study").value = fmt(balances.study);
   document.getElementById("manage-emp-religious").value = fmt(balances.religious);
-  document.getElementById("manage-emp-accrual").value = fmt(balances.accrualRate);
+  document.getElementById("manage-emp-accrual").value = Number(balances.accrualRate).toFixed(4);
   document.getElementById("manage-emp-max-carry").value = fmt(emp.annualMaxCarryOver ?? 0);
   const countryEl = document.getElementById("manage-emp-country");
   if (countryEl) countryEl.value = emp.country || inferCountryFromName(emp.name) || "";
@@ -1019,7 +1372,7 @@ function setupEmployeeForm() {
     const country = document.getElementById("emp-country")?.value || inferCountryFromName(name) || "";
     const accrualInput = parseDecimal(document.getElementById("emp-accrual").value);
     const policyAccrual = getStatutoryAccrualPerMonth({ country, startDisplay: startText }, new Date());
-    const accrual = round2(Math.max(accrualInput, policyAccrual));
+    const accrual = round4(Math.max(accrualInput, policyAccrual));
     const annualMaxCarryOver = parseDecimal(document.getElementById("emp-max-carry").value);
 
     if (!name) {
@@ -1878,7 +2231,7 @@ function setupCountryFields() {
       { country, startDisplay: startText },
       new Date(),
     );
-    empAccrual.value = rate.toFixed(2);
+    empAccrual.value = String(Math.round((rate + Number.EPSILON) * 10000) / 10000);
     const sickOpening = getSickOpeningDays({ country, name: empName?.value?.trim() || "" });
     const empSick = document.getElementById("emp-sick");
     if (empSick && sickOpening != null) {
@@ -1959,6 +2312,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const brand = await loadBrandConfig();
   applyBrand(brand);
   applyRoleVisibility(user);
+  setupAppNav();
   setupLogout();
   setupChangePassword();
   setupPolicyLinks();
