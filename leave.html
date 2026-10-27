@@ -8,14 +8,14 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f5f7fa;
+        --bg: #ffffff;
         --bg-card: #ffffff;
-        --text: #1a2332;
-        --text-muted: #4a5568;
-        --muted: #718096;
-        --accent: #0066b3;
-        --accent-hover: #004d8c;
-        --accent-soft: rgba(0, 102, 179, 0.1);
+        --text: #616372;
+        --text-muted: #616372;
+        --muted: #616372;
+        --accent: #ED1E24;
+        --accent-hover: #C4191E;
+        --accent-soft: rgba(237, 30, 36, 0.1);
         --danger: #c53030;
         --warning: #b7791f;
         --border-subtle: #e2e8f0;
@@ -292,12 +292,18 @@
       }
 
       .btn-ghost {
-        border-color: var(--border-subtle);
-        color: var(--muted);
+        background: #ffffff;
+        border-color: #616372;
+        color: #616372;
       }
 
       .btn-ghost:hover {
-        background: var(--accent-soft);
+        background: #f3f3f5;
+        border-color: #616372;
+        color: #616372;
+      }
+
+      a:not(.btn) {
         color: var(--accent);
       }
 
@@ -535,9 +541,9 @@
       }
 
       .nav-item.is-active {
-        color: var(--accent);
-        background: var(--accent-soft);
-        border-color: var(--border-subtle);
+        color: #ffffff;
+        background: var(--accent);
+        border-color: var(--accent);
       }
 
       .nav-item.has-alert {
@@ -664,6 +670,16 @@
         border-color: rgba(183, 121, 31, 0.35);
         background: rgba(183, 121, 31, 0.08);
         color: #744210;
+      }
+
+      .dashboard-list li.holiday-today {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--text);
+      }
+
+      #dashboard-holidays {
+        margin-top: 24px;
       }
 
       @media (max-width: 1100px) {
@@ -811,6 +827,20 @@
                 <div class="dashboard-section-title">Upcoming (14 days)</div>
                 <ul class="dashboard-list" id="dashboard-upcoming">
                   <li class="muted">No upcoming leave in the next 14 days.</li>
+                </ul>
+              </div>
+            </div>
+            <div class="dashboard-grid dashboard-grid-lists" id="dashboard-holidays">
+              <div>
+                <div class="dashboard-section-title">Public holidays today</div>
+                <ul class="dashboard-list" id="dashboard-holidays-today">
+                  <li class="muted">No public holiday today.</li>
+                </ul>
+              </div>
+              <div>
+                <div class="dashboard-section-title">Upcoming public holidays</div>
+                <ul class="dashboard-list" id="dashboard-holidays-upcoming">
+                  <li class="muted">No upcoming public holidays.</li>
                 </ul>
               </div>
             </div>

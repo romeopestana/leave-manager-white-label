@@ -2,6 +2,7 @@ import {
   applyAnnualBalancePolicy,
   clampManagedLeaveToPolicy,
   getCountryOptions,
+  getEmployeePublicHolidays,
   getMaxAccumulationDays,
   getPolicyDocumentLinks,
   getPolicyForEmployee,
@@ -117,6 +118,26 @@ async function loadLeaveRequests() {
   return res.json();
 }
 
+async function loadTeamCalendar() {
+  const res = await fetch("/api/dashboard-overview", { cache: "no-store" });
+  if (!res.ok) return teamCalendar;
+  teamCalendar = await res.json();
+  return teamCalendar;
+}
+
+function refreshTeamCalendarThenRender() {
+  if (teamCalendarRefresh) return teamCalendarRefresh;
+  teamCalendarRefresh = loadTeamCalendar()
+    .then(() => {
+      teamCalendarRefresh = null;
+      renderDashboard(lastEmployees, lastRequests);
+    })
+    .catch(() => {
+      teamCalendarRefresh = null;
+    });
+  return teamCalendarRefresh;
+}
+
 function renderLeaveRequests(requests) {
   lastRequests = Array.isArray(requests) ? requests : [];
   const tbody = document.getElementById("leave-requests-tbody");
@@ -215,6 +236,8 @@ function renderUserEmployeeLink(employees) {
 
 let lastEmployees = [];
 let lastRequests = [];
+let teamCalendar = null;
+let teamCalendarRefresh = null;
 
 const STORAGE_KEY = "leave-manager-employees-v1";
 const BASELINE_YEAR = 2026;
@@ -226,8 +249,8 @@ const DEFAULT_BRAND = {
   pageTitle: "Leave Manager",
   logoPath: "",
   websiteUrl: "",
-  accentColor: "#0066b3",
-  accentHover: "#004d8c",
+  accentColor: "#ED1E24",
+  accentHover: "#C4191E",
 };
 
 async function loadBrandConfig() {
@@ -896,7 +919,13 @@ function renderDashboard(employees = lastEmployees, requests = lastRequests) {
   horizon.setDate(horizon.getDate() + 14);
 
   const pending = lastRequests.filter((r) => r.status === "pending");
-  const spans = collectLeaveSpans(lastEmployees, lastRequests);
+  const calendarEmployees = Array.isArray(teamCalendar?.employees)
+    ? teamCalendar.employees
+    : lastEmployees;
+  const calendarRequests = Array.isArray(teamCalendar?.leaveRequests)
+    ? teamCalendar.leaveRequests
+    : lastRequests;
+  const spans = collectLeaveSpans(calendarEmployees, calendarRequests);
   const onLeave = spans.filter((s) => s.status === "approved" && spanContainsDay(s, today));
   const upcoming = spans
     .filter((s) => dateKey(s.start) > dateKey(today) && dateKey(s.start) <= dateKey(horizon))
@@ -1043,6 +1072,44 @@ function renderDashboard(employees = lastEmployees, requests = lastRequests) {
     "No upcoming leave in the next 14 days.",
   );
 
+  const holidayRows = [];
+  for (const emp of calendarEmployees) {
+    holidayRows.push(...getEmployeePublicHolidays(emp));
+  }
+  const todayKey = dateKey(today);
+  const holidayItems = holidayRows
+    .map((holiday) => {
+      const parts = String(holiday.date).split("-").map(Number);
+      if (parts.length !== 3 || parts.some((part) => !part)) return null;
+      const when = new Date(parts[0], parts[1] - 1, parts[2]);
+      const key = dateKey(when);
+      return { ...holiday, when, key };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.key - b.key || a.employeeName.localeCompare(b.employeeName));
+  const formatHoliday = (holiday) => {
+    const when = holiday.when.toLocaleDateString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    return `${holiday.employeeName} (${holiday.countryName}) — ${when} — ${holiday.name}`;
+  };
+  setListContent(
+    document.getElementById("dashboard-holidays-today"),
+    holidayItems
+      .filter((holiday) => holiday.key === todayKey)
+      .map((holiday) => ({ className: "holiday-today", text: formatHoliday(holiday) })),
+    "No public holiday today.",
+  );
+  setListContent(
+    document.getElementById("dashboard-holidays-upcoming"),
+    holidayItems
+      .filter((holiday) => holiday.key > todayKey)
+      .map((holiday) => ({ text: formatHoliday(holiday) })),
+    "No upcoming public holidays.",
+  );
+
   const dashDate = document.getElementById("dashboard-date-label");
   if (dashDate) {
     dashDate.textContent = now.toLocaleDateString(undefined, {
@@ -1051,6 +1118,8 @@ function renderDashboard(employees = lastEmployees, requests = lastRequests) {
       year: "numeric",
     });
   }
+
+  if (!teamCalendar && !teamCalendarRefresh) refreshTeamCalendarThenRender();
 }
 
 function renderEmployeesTable(employees) {
@@ -2319,6 +2388,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupCountryFields();
   renderCurrentDate();
 
+  await loadTeamCalendar();
   const employees = await ensurePolicyMigration();
   renderEmployeesTable(employees);
   renderEmployeeSelect(employees);

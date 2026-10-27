@@ -593,6 +593,37 @@ app.get("/api/employees", requireAuth, async (req, res) => {
   }
 });
 
+// Shared dashboard facts. Any signed-in role can read who is on leave,
+// upcoming leave, and public holidays. This does not open employee editing.
+app.get("/api/dashboard-overview", requireAuth, async (req, res) => {
+  try {
+    const all = await loadEmployees();
+    const employees = all.map((emp) => ({
+      id: emp.id,
+      name: emp.name || "",
+      country: emp.country || "",
+      transactions: (emp.transactions || []).map((tx) => ({
+        type: tx.type,
+        days: tx.days,
+        dateISO: tx.dateISO,
+      })),
+    }));
+    const requests = leaveRequests.listLeaveRequests().map((row) => ({
+      id: row.id,
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      type: row.type,
+      days: row.days,
+      dateISO: row.dateISO,
+      status: row.status,
+    }));
+    res.json({ employees, leaveRequests: requests });
+  } catch (err) {
+    console.error("GET /api/dashboard-overview failed:", err);
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
 app.post("/api/employees/bulk-replace", requireAuth, requireRole("admin", "exco"), async (req, res) => {
   try {
     const payload = req.body;

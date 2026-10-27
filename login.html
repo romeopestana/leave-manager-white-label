@@ -7,12 +7,12 @@
     <link rel="stylesheet" href="style.css" />
     <style>
       :root {
-        --bg: #f5f7fa;
+        --bg: #ffffff;
         --bg-card: #ffffff;
-        --text: #1a2332;
-        --muted: #718096;
-        --accent: #0066b3;
-        --accent-hover: #004d8c;
+        --text: #616372;
+        --muted: #616372;
+        --accent: #ED1E24;
+        --accent-hover: #C4191E;
         --border-subtle: #e2e8f0;
         --danger: #c53030;
       }
@@ -74,10 +74,19 @@
       button:hover, .btn-google:hover {
         background: var(--accent-hover);
       }
+      .login-logo {
+        display: block;
+        height: 72px;
+        width: auto;
+        margin: 0 auto 18px;
+      }
+      .login-logo[hidden] {
+        display: none !important;
+      }
       .btn-google {
         background: #fff;
-        color: var(--text);
-        border: 1px solid var(--border-subtle);
+        color: #616372;
+        border: 1px solid #616372;
         margin-bottom: 14px;
       }
       .btn-google:hover {
@@ -142,6 +151,7 @@
   </head>
   <body>
     <div class="login-card">
+      <img id="login-logo" class="login-logo" alt="" hidden />
       <h1 id="login-title">Leave Manager</h1>
       <p class="subtitle" id="login-subtitle">
         Sign in with your company account.
@@ -218,6 +228,13 @@
           document.getElementById("login-title").textContent = title;
           if (brand.accentColor) document.documentElement.style.setProperty("--accent", brand.accentColor);
           if (brand.accentHover) document.documentElement.style.setProperty("--accent-hover", brand.accentHover);
+          const logo = document.getElementById("login-logo");
+          const logoPath = (brand.logoPath || "").trim();
+          if (logo && logoPath) {
+            logo.src = logoPath;
+            logo.alt = brand.companyName || brand.productName || "Leave Manager";
+            logo.hidden = false;
+          }
         } catch {}
       }
 

@@ -87,6 +87,27 @@ function getRulesForCountry(country) {
   return config.countries[country] || null;
 }
 
+/**
+ * 2026 public holidays for an employee, from the country already stored on
+ * the employee or in employeeCountryByName. No country means no holidays.
+ */
+export function getEmployeePublicHolidays(emp) {
+  if (!policyConfig || !emp) return [];
+  const country = emp.country || inferCountryFromName(emp.name);
+  if (!country) return [];
+  const rules = policyConfig.countries?.[country];
+  if (!rules || !Array.isArray(rules.publicHolidays)) return [];
+  return rules.publicHolidays
+    .filter((holiday) => holiday && holiday.date && holiday.name)
+    .map((holiday) => ({
+      date: String(holiday.date),
+      name: String(holiday.name),
+      country,
+      countryName: rules.name || country,
+      employeeName: emp.name || "",
+    }));
+}
+
 export function getStatutoryAnnualDaysPerYear(emp, asOfDate = new Date()) {
   const country = emp.country || inferCountryFromName(emp.name);
   const rules = getRulesForCountry(country);
